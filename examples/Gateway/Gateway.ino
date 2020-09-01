@@ -21,8 +21,8 @@
 #endif
 
 
-char* ssid = "Phil Schatzmann";           //Change this to your router SSID.
-char* password =  "sabrina01";            //Change this to your router password.
+char* ssid = "Your SSID";                 //Change this to your router SSID.
+char* password =  "Your Password";        //Change this to your router password.
 const char * udpAddress = "10.147.17.0";  //Change this to match your network
 const int udpPort = 6789;                 //Change this if you need another port 
 unsigned long intervall = 500;            // send every 500ms (=2 messages per second)
