@@ -15,12 +15,12 @@ class SpektrumCSV {
     public:
         SpektrumCSV();
         SpektrumCSV(char delimiter);
-        void toString(SpektrumSatellite<T> &data, uint8_t* str, unsigned int len);
-        void parse(uint8_t* str, SpektrumSatellite<T> *satellite);
+        void toString(SpektrumSatellite<T> &satellite, uint8_t* dataSting, unsigned int maxLen);
+        void parse(uint8_t* str, SpektrumSatellite<T> &satellite);
         void setFactor(double factor);
     private:
       char delimiter;
-      uint8_t* findEnd(uint8_t* start);
+      char* findEnd(char* start);
 };
 
 template <class T>
@@ -52,26 +52,27 @@ void SpektrumCSV<T>::toString(SpektrumSatellite<T> &satellite, uint8_t* str, uns
  * Parse tab seperated values
  */
 template <class T>
-void SpektrumCSV<T>::parse(uint8_t* str, SpektrumSatellite<T> *satellite){
-    uint8_t* start = str;
+void SpektrumCSV<T>::parse(uint8_t* str, SpektrumSatellite<T> &satellite){
+    char* start = (char*)str;
     for (int j=0; j< MAX_CHANNELS; j++){
-        uint8_t* end = findEnd(start);
+        char* end = findEnd(start);
         if (end==NULL){
             break;
         }
-        double value = strtod((char*)start, &end);
+        double value = strtod(start, &end);
         satellite.setChannelValue((Channel)j, value);
         start = end+1;
     }
 }
 
 template <class T>
-uint8_t* SpektrumCSV<T>::findEnd(uint8_t* start) {
-    char* end = strchr ((char*) start, '\t' );
+char* SpektrumCSV<T>::findEnd(char* startU) {
+    char* start = (char*) startU;
+    char* end = strchr (start, delimiter );
     if (end==NULL){
-        char* end = strchr ((char*) start, '\n' );
+        end = strchr (start, '\n' );
     } else if (end==NULL){
-        char* end = strchr ((char*) start, NULL );
+        end = strchr (start, NULL );
     }
     return end;
 }

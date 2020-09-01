@@ -153,6 +153,9 @@ class SpektrumSatellite {
 
     Status getStatus();
     
+    // provides the unconverted channel values
+    uint16_t* getChannelValuesRaw();
+    
     // Activate/Deactivates logging
     void setLog(Stream& log);
     // write info to the log
@@ -507,7 +510,7 @@ void SpektrumSatellite<T>::setAux1(T value){
 
 template <class T>
 void SpektrumSatellite<T>::setAux2(T value){
-  setChannelValue(Aux3,value);
+  setChannelValue(Aux2,value);
 }
 
 template <class T>
@@ -676,6 +679,11 @@ void SpektrumSatellite<T>::logHex(const char* str, int value) {
 template <class T>
 void SpektrumSatellite<T>::setLog(Stream& logSer){
   this->serialLog = &logSer;
+}
+
+template <class T>
+uint16_t* SpektrumSatellite<T>::getChannelValuesRaw() {
+  return channelValues;
 }
 
 
