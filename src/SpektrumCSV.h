@@ -20,7 +20,6 @@ class SpektrumCSV {
         void setFactor(double factor);
     private:
       char delimiter;
-      double factor = 1.0;
       uint8_t* findEnd(uint8_t* start);
 };
 
