@@ -4,7 +4,26 @@
  */
 
 #include "SpektrumSatellite.h"
+#include "Scaler.h"
 
+void testScaling() {
+  Serial.println("***********************");
+  Serial.println("testScaling");
+  Scaler<uint16_t> s;
+  s.setValues(0,10,0,2048);
+
+  for (int j=0;j<10;j++){
+      int scaled = s.scale(j);
+      int back = s.deScale(scaled);
+      Serial.print(j);
+      Serial.print("->");
+      Serial.print(scaled);
+      Serial.print("->");
+      Serial.print(back);
+      Serial.print(" -> ");
+      Serial.println(j == back ? "OK" : "failed");
+  }
+}
 
 void testIs2048() {
   Serial.println("***********************");
@@ -68,7 +87,7 @@ void testCSV() {
   Serial.println("testCSV");
   SpektrumSatellite<uint16_t> satellite(Serial); 
   SpektrumCSV<uint16_t> csv(',');
-  //satellite.setChannelValueRange(0, 1000);
+  satellite.setChannelValueRange(0, 11);
 
   for (int j=0;j<MAX_CHANNELS;j++){
       satellite.setChannelValue((Channel)j,j);
@@ -104,6 +123,8 @@ void testBinary() {
   Serial.println("***********************");
   Serial.println("testBinary ");
   SpektrumSatellite<uint16_t> satellite(Serial); 
+  satellite.setChannelValueRange(0, 11);
+
   for (int j=0;j<MAX_CHANNELS;j++){
       satellite.setChannelValue((Channel)j,j);
   }
@@ -142,6 +163,7 @@ void setup() {
   Serial.println("***********************");
   Serial.println("Tests:");
   Serial.println("***********************");
+  testScaling();
   testIs2048();
   testIs1024();
   testRange1000();

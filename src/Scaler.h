@@ -25,12 +25,18 @@ template <class T> class Scaler {
 
   private:
     bool active;
+    bool isRounding;
     T inMin,inMax,outMin,outMax;
+
 };
 
 template <class T>
 Scaler<T>::Scaler(){
   active = false;
+  T i1 = 1;
+  T i2 = 3;
+  T result = (i1 / i2) * i2;
+  isRounding =  (1.0 - result > 0.1);
 }
 
 template <class T>
@@ -39,6 +45,7 @@ void Scaler<T>::setValues(T fromMin, T fromMax, T toMin, T toMax) {
    this->inMax = fromMax;
    this->outMin = toMin;
    this->outMax = toMax;
+   this->active = true;
 }
 
 
@@ -66,10 +73,9 @@ bool Scaler<T>::isActive(){
 template <class T>
 T Scaler<T>::scale(uint16_t value) {
   if (this->active) {
-    if (this->inMin!=this->outMin || this->inMax != this->outMax){
-      //return (value - this->inMin) / (this->inMax - this->inMin) *  (this->outMax - this->outMin) + this->outMin;
-      return map(value, this->inMin, this->inMax, this->outMin, this->outMax);
-    } 
+      // (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+      double r = (((double)value - (double)inMin) * ((double)outMax - (double)outMin) / ((double)inMax - (double)inMin) + (double)outMin);
+      value = isRounding ? round(r) : r;
   }
   return value;
 }
@@ -78,13 +84,10 @@ T Scaler<T>::scale(uint16_t value) {
 template <class T>
 uint16_t Scaler<T>::deScale(T value) {
   if (this->active) {
-    if (this->inMin!=this->outMin || this->inMax != this->outMax){
-      //return (value - this->inMin) / (this->inMax - this->inMin) *  (this->outMax - this->outMin) + this->outMin;
-      return map(value, this->outMin, this->outMax, this->inMin, this->inMax);
-    } 
+      double r = (((double)value - (double)outMin) * ((double)inMax - (double)inMin) / ((double)outMax - (double)outMin) + (double)inMin);
+      value = isRounding ? round(r) : r;
   }
   return value;
 }
-
 
 #endif /* SCALER_H_ */

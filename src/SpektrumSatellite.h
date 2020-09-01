@@ -574,7 +574,7 @@ byte *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
     uint16_t channelShift = is2048() ? 11 : 10;  
     // update the data in the sendValues buffer
     if (auxData){
-      for(int j=5;j<12;j++){
+      for(int j=5;j<MAX_CHANNELS;j++){
         sendValues[j-5+1] = channelValues[j] & maskVALUE | j<<channelShift;
       }
     } else {
@@ -700,6 +700,5 @@ template <class T>
 uint16_t* SpektrumSatellite<T>::getChannelValuesRaw() {
   return channelValues;
 }
-
 
 #endif /* SPECTRUMSATELLITE_H_ */
