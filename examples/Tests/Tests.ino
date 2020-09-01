@@ -9,6 +9,7 @@
 
 void testIs2048() {
   SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+  satellite.setLog(Serial);
 
   Serial.print("testIs2048 -> ");
   Serial.println(satellite.is2048()?"ok" : "failed");
@@ -17,6 +18,7 @@ void testIs2048() {
 
 void testRange1000() {
   SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+  satellite.setLog(Serial);
   satellite.setChannelValueRange(0, 1000);
 
   satellite.setThrottle(1000);
@@ -34,6 +36,7 @@ void testRange1000() {
 
 void testFloat() {
   SpektrumSatellite<float> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+  satellite.setLog(Serial);
   satellite.setChannelValueRange(-1.0, 1.0);
 
   satellite.setThrottle(1.0);
@@ -52,7 +55,9 @@ void testFloat() {
 void testCSV() {
   SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
   SpektrumCSV<uint16_t> csv(',');
+  satellite.setLog(Serial);
   satellite.setChannelValueRange(0, 1000);
+  satellite.setLog(Serial);
 
   for (int j=0;j<MAX_CHANNELS;j++){
       satellite.setChannelValue((Channel)j,j);
@@ -62,7 +67,7 @@ void testCSV() {
   csv.toString(satellite, buffer, 1000);
 
   char* expected = "0,1,2,3,4,5,6,7,8,9,10,11\n";
-  Serial.println(expected;
+  Serial.println(expected);
   Serial.println((char*)buffer);
   Serial.print("testCSV toString -> ");
   Serial.println(strcmp((char*)buffer,expected)?"ok" : "failed");
@@ -82,23 +87,24 @@ void testCSV() {
 
 void testBinary() {
   SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+  satellite.setLog(Serial);
   for (int j=0;j<MAX_CHANNELS;j++){
       satellite.setChannelValue((Channel)j,j);
   }
   
   // get and parse spektrum data
-  byte* buffer = spektrum.getSendBuffer(false);
-  parseFrame(buffer);
+  byte* buffer = satellite.getSendBuffer(false);
+  satellite.parseFrame(buffer);
 
-  byte* buffer = spektrum.getSendBuffer(true);
-  parseFrame(buffer);
+  buffer = satellite.getSendBuffer(true);
+  satellite.parseFrame(buffer);
 
   // check the data
   for (int j=0;j<MAX_CHANNELS;j++){
       Serial.print("testBinary ");
       Serial.print(j);
-      Serial.print(" -> ")
-      Serial.println(satellite.getChannelValue((Channel)j) == j ? "OK" : "Error")
+      Serial.print(" -> ");
+      Serial.println(satellite.getChannelValue((Channel)j) == j ? "OK" : "Error");
   }
 
 }
@@ -106,8 +112,10 @@ void testBinary() {
 
 
 void testWaitForData() {
-  Serial.print("testCSV waitForData -> ");
   SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+  satellite.setLog(Serial);
+
+  Serial.print("testCSV waitForData -> ");
   satellite.waitForData();
   Serial.println("ok");
 
@@ -123,6 +131,7 @@ void setup() {
   testRange1000();
   testFloat();
   testCSV();
+  testBinary();
   testWaitForData();
 }
 

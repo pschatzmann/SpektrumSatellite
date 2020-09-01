@@ -117,8 +117,8 @@ class SpektrumSatellite {
     void setAux6(T value);
     void setAux7(T value);
 
-    uint16_t* getSendBuffer(boolean auxData);
-    uint16_t* getSendBuffer();
+    byte* getSendBuffer(boolean auxData);
+    byte* getSendBuffer();
     void sendData(Stream& out);
     
     // Checks that we did not time out
@@ -548,12 +548,12 @@ void SpektrumSatellite<T>::setAux7(T value){
 }
 
 template <class T>
-uint16_t *SpektrumSatellite<T>::getSendBuffer() {
+byte *SpektrumSatellite<T>::getSendBuffer() {
   return getSendBuffer(false);
 }
 
 template <class T>
-uint16_t *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
+byte *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
 
     // if the mode is internal we need to add the system id
     if (isInternal) {
@@ -579,7 +579,7 @@ uint16_t *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
         sendValues[j+1] = channelValues[j] && maskVALUE | j<<channelShift;
       }
     }
-    return sendValues;
+    return (byte*)sendValues;
 }
 
 
