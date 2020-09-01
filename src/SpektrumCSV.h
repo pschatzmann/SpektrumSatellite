@@ -42,8 +42,12 @@ void SpektrumCSV<T>::toString(SpektrumSatellite<T> &satellite, uint8_t* str, uns
     uint8_t* start = str;
     for (int j=0; j < MAX_CHANNELS; j++){
         float val = satellite.getChannelValue((Channel)j);
-        int len = sprintf((char*)start, "%f",val);
+        int len = sprintf((char*)start, "%.2f", val);
         start+=len;
+        if (j<MAX_CHANNELS-1){
+            *start = delimiter;
+            start++;
+        }
     }
     sprintf((char*)start,"\n");
 }

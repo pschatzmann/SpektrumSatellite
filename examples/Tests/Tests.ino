@@ -1,5 +1,4 @@
 
-
 /**
  * Test cases for the  SpektrumSatellite class
  */
@@ -8,56 +7,68 @@
 
 
 void testIs2048() {
-  SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
-  satellite.setLog(Serial);
+  Serial.println("***********************");
+  SpektrumSatellite<uint16_t> satellite(Serial); 
 
-  Serial.print("testIs2048 -> ");
+  Serial.print("testIs2048 => ");
   Serial.println(satellite.is2048()?"ok" : "failed");
 
 }
 
+void testIs1024() {
+  Serial.println("***********************");
+  SpektrumSatellite<uint16_t> satellite(Serial); 
+  satellite.setBindingMode(Internal_DSM2_22ms);
+  Serial.print("testIs1024 => ");
+  Serial.println(!satellite.is2048()?"ok" : "failed");
+}
+
+
 void testRange1000() {
-  SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
-  satellite.setLog(Serial);
+  Serial.println("***********************");
+  Serial.println("testRange1000");
+  SpektrumSatellite<uint16_t> satellite(Serial); 
   satellite.setChannelValueRange(0, 1000);
 
   satellite.setThrottle(1000);
 
-  Serial.print("testRange1000 raw-> ");
-  Serial.println(satellite.getChannelValuesRaw()[Throttle] == 2048 ?"ok" : "failed");
-
-  Serial.print("testRange1000  getThrottle -> ");
+  Serial.print("testRange1000  getThrottle => ");
   Serial.println(satellite.getThrottle() == 1000 ?"ok" : "failed");
 
-  Serial.print("testRange1000  getChannelValue -> ");
+  Serial.print("testRange1000  getChannelValue => ");
   Serial.println(satellite.getChannelValue(Throttle) == 1000 ?"ok" : "failed");
+
+  Serial.print("testRange1000 raw =>> ");
+  Serial.println(satellite.getChannelValuesRaw()[Throttle] == 2048 ?"ok" : "failed");
+
 }
 
 
 void testFloat() {
-  SpektrumSatellite<float> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
-  satellite.setLog(Serial);
+  Serial.println("***********************");
+  Serial.println("testFloat");
+  SpektrumSatellite<float> satellite(Serial); 
   satellite.setChannelValueRange(-1.0, 1.0);
 
   satellite.setThrottle(1.0);
 
-  Serial.print("testFloat getChannelValuesRaw -> ");
+  Serial.print("testFloat getChannelValuesRaw => ");
   Serial.println(satellite.getChannelValuesRaw()[Throttle] == 2048?"ok" : "failed");
 
-  Serial.print("testFloat getThrottle-> ");
+  Serial.print("testFloat getThrottle => ");
   Serial.println(satellite.getThrottle() == 1.0 ? "ok" : "failed");
 
-  Serial.print("testFloat getChannelValue(Throttle)-> ");
+  Serial.print("testFloat getChannelValue(Throttle) => ");
   Serial.println(satellite.getChannelValue(Throttle) == 1.0 ? "ok" : "failed");
 
 }
 
 void testCSV() {
-  SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+  Serial.println("***********************");
+  Serial.println("testCSV");
+  SpektrumSatellite<uint16_t> satellite(Serial); 
   SpektrumCSV<uint16_t> csv(',');
-  satellite.setLog(Serial);
-  satellite.setChannelValueRange(0, 1000);
-  satellite.setLog(Serial);
+  //satellite.setChannelValueRange(0, 1000);
 
   for (int j=0;j<MAX_CHANNELS;j++){
       satellite.setChannelValue((Channel)j,j);
@@ -66,11 +77,11 @@ void testCSV() {
   uint8_t buffer[1000];
   csv.toString(satellite, buffer, 1000);
 
-  char* expected = "0,1,2,3,4,5,6,7,8,9,10,11\n";
-  Serial.println(expected);
-  Serial.println((char*)buffer);
-  Serial.print("testCSV toString -> ");
-  Serial.println(strcmp((char*)buffer,expected)?"ok" : "failed");
+  char* expected = "0.00,1.00,2.00,3.00,4.00,5.00,6.00,7.00,8.00,9.00,10.00,11.00\n";
+  Serial.print(expected);
+  Serial.print((char*)buffer);
+  Serial.print("testCSV toString => ");
+  Serial.println(strcmp((char*)buffer,expected)==0 ? "ok" : "failed");
 
 
   for (int j=0;j<MAX_CHANNELS;j++){
@@ -78,16 +89,21 @@ void testCSV() {
   }
   csv.parse(buffer, satellite);
 
-  Serial.print("testCSV parse Throttle -> ");
-  Serial.println(satellite.getChannelValue(Throttle)==0 ? "ok" : "failed");
-  Serial.print("testCSV parse Aux7 -> ");
-  Serial.println(satellite.getChannelValue(Aux7)==11 ? "ok" : "failed");
+  // check the data
+  for (int j=0;j<MAX_CHANNELS;j++){
+      Serial.print("testCSV ");
+      Serial.print(j);
+      Serial.print(" => ");
+      Serial.print(satellite.getChannelValue((Channel)j));
+      Serial.println(satellite.getChannelValue((Channel)j) == j ? " OK" : " Error");
+  }
 
 }
 
 void testBinary() {
-  SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
-  satellite.setLog(Serial);
+  Serial.println("***********************");
+  Serial.println("testBinary ");
+  SpektrumSatellite<uint16_t> satellite(Serial); 
   for (int j=0;j<MAX_CHANNELS;j++){
       satellite.setChannelValue((Channel)j,j);
   }
@@ -103,31 +119,31 @@ void testBinary() {
   for (int j=0;j<MAX_CHANNELS;j++){
       Serial.print("testBinary ");
       Serial.print(j);
-      Serial.print(" -> ");
-      Serial.println(satellite.getChannelValue((Channel)j) == j ? "OK" : "Error");
+      Serial.print(" => ");
+      Serial.print(satellite.getChannelValue((Channel)j));
+      Serial.println(satellite.getChannelValue((Channel)j) == j ? " OK" : " Error");
   }
-
 }
 
-
-
 void testWaitForData() {
+  Serial.println("***********************");
+  Serial.println("testCSV waitForData -> ");
   SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
-  satellite.setLog(Serial);
 
-  Serial.print("testCSV waitForData -> ");
   satellite.waitForData();
-  Serial.println("ok");
+  Serial.println("==> ok");
 
 }
 
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println();
-  Serial.println("tests:");
-
+  Serial.println("***********************");
+  Serial.println("Tests:");
+  Serial.println("***********************");
   testIs2048();
+  testIs1024();
   testRange1000();
   testFloat();
   testCSV();
@@ -137,5 +153,3 @@ void setup() {
 
 void loop() {
 }
-
-

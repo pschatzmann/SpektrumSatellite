@@ -42,7 +42,7 @@ enum Status {
   Receiving
 };
 
-// Define all Available Channels 
+// Define all 12 Available Channels 
 enum Channel {
   Throttle,
   Aileron,
@@ -167,7 +167,7 @@ class SpektrumSatellite {
  
   private:
     uint16_t channelValues[12];
-    uint16_t sendValues[8];
+    uint16_t sendValues[7];
     unsigned long time;
     unsigned long successCount;
     unsigned long failCount;
@@ -180,9 +180,8 @@ class SpektrumSatellite {
     boolean isSendAuxData;
     
     HardwareSerial *serial;
-    Stream *serialLog;
-    Scaler<T> *scaler;
-    Scaler<T> *sendScaler;
+    Stream *serialLog = NULL;
+    Scaler<T> scaler;
     BindMode bindMode; 
     Status status;   
     
@@ -192,7 +191,7 @@ class SpektrumSatellite {
     void logFrame(boolean result);
 };
 
-
+// 12 channels
 const static char* ChannelNames[] = {
   "Throttle",
   "Aileron",
@@ -211,17 +210,16 @@ const static char* ChannelNames[] = {
 template <class T>
 SpektrumSatellite<T>::SpektrumSatellite(HardwareSerial& serial) {
     // Internal_DSMx_11ms is recommended bind value
-    setBindingMode(Internal_DSMx_11ms);
     this->serial = &serial;
+    setBindingMode(Internal_DSMx_11ms);
     if (!serial) {
       setupSerial();
     }
-
     // setup Initial Status
     this->status = NotConnected;
-    if (isReceivingData(1000)){
-      this->status = Receiving;    
-    }
+    //if (isReceivingData(1000)){
+    //  this->status = Receiving;    
+    //}
 }
 
 template <class T>
@@ -338,21 +336,24 @@ void SpektrumSatellite<T>::setupSerial(void) {
 
 template <class T>
 bool SpektrumSatellite<T>::parseFrame(byte* inData){
+  uint16_t* inData16 =  (uint16_t*) inData;
     // a frame is 16 bytes -> 7 channels + fades
     // determine system and fades
     if (isInternal){
         fades = inData[0];
         system = (System)inData[1];
     } else {
-        fades = inData[0] * 256 + inData[1];
+        fades = inData16[0];
     }
 
+    uint16_t channelShift = is2048() ? 11 : 10;  
     // determine channel values
-    for (int i = 1; i <= SEND_BUFFER_SIZE/2; i++) {
-      short inValue = inData[i * 2] * 256 + inData[i * 2 + 1];
-      short channelID = inValue & maskCHANID;
+    for (int i = 1; i <= 7; i++) {
+      short inValue = inData16[i];
+      short channelID = (inValue & maskCHANID)>>channelShift;
+      short channelValue = inValue & maskVALUE;
+
       if (channelID>=0 && channelID<MAX_CHANNELS) {
-        short channelValue = inValue & maskVALUE;
         channelValues[channelID] = channelValue; 
       } else {
         log("Invalid Channel in parseFrame: ",channelID);
@@ -407,15 +408,6 @@ void SpektrumSatellite<T>::logFrame(boolean result) {
     frameCount++;
 }
 
-template <class T>
-T SpektrumSatellite<T>::getChannelValue(Channel channelId){
-  return scaler->scale(channelValues[channelId]);
-}
-
-template <class T>
-const char* SpektrumSatellite<T>::getChannelName(Channel channelId){
-  return ChannelNames[channelId];
-}
 
 template <class T>
 T SpektrumSatellite<T>::getThrottle(){
@@ -479,13 +471,24 @@ T SpektrumSatellite<T>::getAux7(){
 
 template <class T>
 void SpektrumSatellite<T>::setChannelValue(Channel channelId, T value) {
-  if (channelId>=0 && channelId<= Aux7){
-    channelValues[channelId] = scaler->deScale(value);
+  if (channelId>=Throttle && channelId<= Aux7){
+    channelValues[channelId] = scaler.deScale(value);
     if (channelId>=Aux1){
       isSendAuxData = true;
     }
   }
 }
+
+template <class T>
+T SpektrumSatellite<T>::getChannelValue(Channel channelId){
+  return scaler.scale(channelValues[channelId]);
+}
+
+template <class T>
+const char* SpektrumSatellite<T>::getChannelName(Channel channelId){
+  return ChannelNames[channelId];
+}
+
 
 template <class T>
 void SpektrumSatellite<T>::setThrottle(T value) {
@@ -571,12 +574,12 @@ byte *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
     uint16_t channelShift = is2048() ? 11 : 10;  
     // update the data in the sendValues buffer
     if (auxData){
-      for(int j=7;j<Aux7;j++){
-        sendValues[j-7+1] = channelValues[j-7] && maskVALUE | j<<channelShift;
+      for(int j=5;j<12;j++){
+        sendValues[j-5+1] = channelValues[j] & maskVALUE | j<<channelShift;
       }
     } else {
       for(int j=0;j<7;j++){
-        sendValues[j+1] = channelValues[j] && maskVALUE | j<<channelShift;
+        sendValues[j+1] = channelValues[j] & maskVALUE | j<<channelShift;
       }
     }
     return (byte*)sendValues;
@@ -635,9 +638,12 @@ bool SpektrumSatellite<T>::isReceivingData(){
 
 template <class T>
 void SpektrumSatellite<T>::setChannelValueRange(T min, T max){
+  log("setChannelValueRange");
   // set ouput value range
-  scaler->setActive(true);
-  scaler->setValues(0,is2048() ? 2048: 1024,min,max);
+  scaler.setActive(true);
+  T inMax = is2048() ? 2048: 1024;
+  scaler.setValues(0,inMax,min,max);
+  log("setChannelValueRange <-");
 }
 
 template <class T>
@@ -652,7 +658,7 @@ uint16_t SpektrumSatellite<T>::getFades() {
 
 template <class T>
 Scaler<T>* SpektrumSatellite<T>::getScaler(){
-  return this->scaler;
+  return &this.scaler;
 }
 
 template <class T>
