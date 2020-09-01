@@ -61,9 +61,11 @@ void testCSV() {
   uint8_t buffer[1000];
   csv.toString(satellite, buffer, 1000);
 
+  char* expected = "0,1,2,3,4,5,6,7,8,9,10,11\n";
+  Serial.println(expected;
   Serial.println((char*)buffer);
   Serial.print("testCSV toString -> ");
-  Serial.println(strcmp((char*)buffer,"0,1,2,3,4,5,6,7,8,9,10,11\n")?"ok" : "failed");
+  Serial.println(strcmp((char*)buffer,expected)?"ok" : "failed");
 
 
   for (int j=0;j<MAX_CHANNELS;j++){
@@ -77,6 +79,31 @@ void testCSV() {
   Serial.println(satellite.getChannelValue(Aux7)==11 ? "ok" : "failed");
 
 }
+
+void testBinary() {
+  SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+  for (int j=0;j<MAX_CHANNELS;j++){
+      satellite.setChannelValue((Channel)j,j);
+  }
+  
+  // get and parse spektrum data
+  byte* buffer = spektrum.getSendBuffer(false);
+  parseFrame(buffer);
+
+  byte* buffer = spektrum.getSendBuffer(true);
+  parseFrame(buffer);
+
+  // check the data
+  for (int j=0;j<MAX_CHANNELS;j++){
+      Serial.print("testBinary ");
+      Serial.print(j);
+      Serial.print(" -> ")
+      Serial.println(satellite.getChannelValue((Channel)j) == j ? "OK" : "Error")
+  }
+
+}
+
+
 
 void testWaitForData() {
   Serial.print("testCSV waitForData -> ");

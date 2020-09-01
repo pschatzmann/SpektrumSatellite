@@ -86,7 +86,8 @@ class SpektrumSatellite {
     
     // Receive a data record from the Satellite Receiver
     bool getFrame();
-    
+    bool parseFrame(byte* inData);
+
     // Gets the scaled value for the indicated channel
     T getChannelValue(Channel channelId);
     T getThrottle();
@@ -336,42 +337,50 @@ void SpektrumSatellite<T>::setupSerial(void) {
 }
 
 template <class T>
+bool SpektrumSatellite<T>::parseFrame(byte* inData){
+    // a frame is 16 bytes -> 7 channels + fades
+    // determine system and fades
+    if (isInternal){
+        fades = inData[0];
+        system = (System)inData[1];
+    } else {
+        fades = inData[0] * 256 + inData[1];
+    }
+
+    // determine channel values
+    for (int i = 1; i <= SEND_BUFFER_SIZE/2; i++) {
+      short inValue = inData[i * 2] * 256 + inData[i * 2 + 1];
+      short channelID = inValue & maskCHANID;
+      if (channelID>=0 && channelID<MAX_CHANNELS) {
+        short channelValue = inValue & maskVALUE;
+        channelValues[channelID] = channelValue; 
+      } else {
+        log("Invalid Channel in parseFrame: ",channelID);
+      }
+    }
+    return true;
+}
+
+
+template <class T>
 bool SpektrumSatellite<T>::getFrame(){
     short inByte;
-    byte inData[16];
+    byte inData[SEND_BUFFER_SIZE];
     boolean result = false;
     log("available data:",serial->available());
     
     //  16-byte data packet every 11ms or 22ms, 
     if (serial->available() >= 16) {
       time = millis();
-      inByte = serial->readBytes(inData,16);
-
-      // determine system and fades
-      if (isInternal){
-         system = (System)inData[1];
-         fades = inData[0];
-      } else {
-         fades = inData[0] * 256 + inData[1];
-      }
-
-      // determine channel values
-      for (int i = 1; i < MAX_CHANNELS; i++) {
-        short inValue = inData[i * 2] * 256 + inData[i * 2 + 1];
-        short channelID = inValue & maskCHANID;
-        if (channelID>=0 && channelID<MAX_CHANNELS) {
-          short channelValue = inValue & maskVALUE;
-          channelValues[channelID] = channelValue; 
-        }
-      }
-    
+      inByte = serial->readBytes(inData,SEND_BUFFER_SIZE);
+      parseFrame(inData);
       // check if the frame is valid
       result = isInternal ? isValidSystem() && isTransaction() : isTransaction();
-      // update the status
-      if (result){
-        status = Receiving;
-      }
-    } 
+    }
+    // update the status
+    if (result){
+      status = Receiving;
+    }
 
     // log the status
     logFrame(result);    
