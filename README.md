@@ -11,7 +11,7 @@
  - Support of different data types and automatic scaling of channel values 
  - Optional Support of logging using a specified Serial pin
 
-Usage Scenarios
+## Usage Scenarios
 The following usage scenarios are supported and documented with examples
  - Binding of a Spektrum Satellite (Bind)
  - Implement a Receiver:  Receive Serial Satellite Data and update PWN Pins (Receive)
