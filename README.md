@@ -1,6 +1,6 @@
 # Spectrum Satellite API for Arduino
 
- Arduino API for the Spectrum Satellite Receiver. We support Arduinos, ESP32, ESP8266 etc.
+ This project implements an Arduino API for the Spectrum Satellite Receiver. It should work with any type of board (e.g. Arduinos, ESP32, ESP8266 etc)
 
  - Complete Implementation of the Specification (See https://www.spektrumrc.com/ProdInfo/Files/Remote%20Receiver%20Interfacing%20Rev%20A.pdf)
  - Support for sending data
@@ -10,6 +10,7 @@
  - Automatic handling of 1024 or 2048 servo data
  - Support of different data types and automatic scaling of channel values 
  - Optional Support of logging using a specified Serial pin
+ - Provides Serialization to and from CSV format
 
 ## Usage Scenarios
 The following usage scenarios are supported and documented with examples
