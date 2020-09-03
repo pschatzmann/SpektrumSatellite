@@ -166,4 +166,12 @@ void loop() {
 ```
 
 
+## Installation
+You can download this project as ZIP and in the Arduino IDE use -> Sketch -> Include Library -> Add ZIP Library. 
 
+The recommended way howerver is to clone the project to your libraries directory. E.g. with
+
+```
+    cd ~/Documents/Arduino/libraries
+    git clone https://github.com/pschatzmann/SpektrumSatellite.git
+```

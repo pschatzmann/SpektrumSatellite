@@ -86,7 +86,6 @@ class SpektrumSatellite {
     
     // Receive a data record from the Satellite Receiver
     bool getFrame();
-    bool parseFrame(byte* inData);
 
     // Gets the scaled value for the indicated channel
     T getChannelValue(Channel channelId);
@@ -118,19 +117,16 @@ class SpektrumSatellite {
     void setAux7(T value);
 
     void sendData();
-    // usually not needed but in case when you need to access the data
-    byte* getSendBuffer(boolean auxData);
-    byte* getSendBuffer();
     
     // Checks that we did not time out
     bool isConnected();
     bool isConnected(long timeoutMs);
     
-    // Test if we are receiving any valid data within the indicated time
-    bool isReceivingData(unsigned long timeOut);
+    // // Test if we are receiving any valid data within the indicated time
+    // bool isReceivingData(unsigned long timeOut);
     
-    // Test if we are receiving any valid data within the default time
-    bool isReceivingData();
+    // // Test if we are receiving any valid data within the default time
+    // bool isReceivingData();
 
     // wait for any data
     void waitForData();
@@ -149,6 +145,8 @@ class SpektrumSatellite {
     
     // Determines the system
     System getSystem();
+
+    // checks if the biggest number is 2048 (instead of 1024)
     bool is2048();
     
     // Determines the fades
@@ -156,17 +154,22 @@ class SpektrumSatellite {
 
     Status getStatus();
     
-    // provides the unconverted channel values
-    uint16_t* getChannelValuesRaw();
-    
-    // Activate/Deactivates logging
+
+
+    // == usually not needed but in case when you need to access the data
+    bool parseFrame(byte* inData);
+    byte* getSendBuffer(boolean auxData);
+    byte* getSendBuffer();
+    // logging
     void setLog(Stream& log);
-    // write info to the log
     void log(const char*);
     void log(const char*, const char*);
     void log(const char*, int value);
     void logHex(const char*, int value);
- 
+    // provides the unconverted channel values
+    uint16_t* getChannelValuesRaw();
+  
+
   private:
     uint16_t channelValues[12];
     uint16_t sendValues[7];
@@ -274,9 +277,6 @@ boolean SpektrumSatellite<T>::isValidSystem() {
     log("isValidSystem: ",result ? "true":"false");
   return result;  
 }
-
-
-
 
 template <class T>
 bool SpektrumSatellite<T>::parseFrame(byte* inData){
@@ -576,25 +576,25 @@ void SpektrumSatellite<T>::waitForData(){
   }
 }
 
-template <class T>
-bool SpektrumSatellite<T>::isReceivingData(unsigned long timeOut) {
-  bool result = false;
-  unsigned long start = millis();
-  while(!result) {
-      result = getFrame();
-      if (millis() - start > timeOut){
-        break;
-      }
-      delay(1000);
-  }
-  log("isReceivingData:",result?"true":"false");
-  return result;
-}
+// template <class T>
+// bool SpektrumSatellite<T>::isReceivingData(unsigned long timeOut) {
+//   bool result = false;
+//   unsigned long start = millis();
+//   while(!result) {
+//       result = getFrame();
+//       if (millis() - start > timeOut){
+//         break;
+//       }
+//       delay(1000);
+//   }
+//   log("isReceivingData:",result?"true":"false");
+//   return result;
+// }
 
-template <class T>
-bool SpektrumSatellite<T>::isReceivingData(){
-  return isReceivingData(DEFAULT_RECEIVING_TIMEOUT);  // 10 sec
-}
+// template <class T>
+// bool SpektrumSatellite<T>::isReceivingData(){
+//   return isReceivingData(DEFAULT_RECEIVING_TIMEOUT);  // 10 sec
+// }
 
 template <class T>
 void SpektrumSatellite<T>::setChannelValueRange(T min, T max){
