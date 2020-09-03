@@ -583,6 +583,7 @@ void SpektrumSatellite<T>::sendData(){
   for (int j=0;j<8;j++){
     serial->write(data[j]);
   }
+  serial->flush();
 
   // send Aux if necessary
   if (isSendAuxData){ 
@@ -590,6 +591,7 @@ void SpektrumSatellite<T>::sendData(){
     for (int j=0;j<8;j++){
       serial->write(data[j]);
     }
+    serial->flush();
   }
 }
 
