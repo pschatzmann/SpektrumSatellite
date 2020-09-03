@@ -117,12 +117,14 @@ class SpektrumSatellite {
     void setAux6(T value);
     void setAux7(T value);
 
+    void sendData();
+    // usually not needed but in case when you need to access the data
     byte* getSendBuffer(boolean auxData);
     byte* getSendBuffer();
-    void sendData();
     
     // Checks that we did not time out
-    bool isTransaction();
+    bool isConnected();
+    bool isConnected(long timeoutMs);
     
     // Test if we are receiving any valid data within the indicated time
     bool isReceivingData(unsigned long timeOut);
@@ -168,7 +170,7 @@ class SpektrumSatellite {
   private:
     uint16_t channelValues[12];
     uint16_t sendValues[7];
-    unsigned long time;
+    unsigned long timeOfLastRead;
     unsigned long successCount;
     unsigned long failCount;
     unsigned long frameCount;
@@ -274,45 +276,6 @@ boolean SpektrumSatellite<T>::isValidSystem() {
 }
 
 
-/**
- * The Spektrum Satellite power pin i using 3.3VDC +/-5%, 20mA max. However for the ESP8266 The 
- * maximum current that can be drawn from a single GPIO pin is 12mA.
- */
-template <class T>
-void SpektrumSatellite<T>::startBinding(unsigned powerPin, unsigned rxPin) {  
-    // switch off serial interface
-    if(serial) {
-      log("startBinding");
-    
-      pinMode(rxPin, OUTPUT);    // sets the digital pin as output
-      digitalWrite(rxPin, LOW);  // make sure that the pin off
-      delay(1000);
-
-      // To put a receiver into bind mode, within 200ms of power application the host device 
-      // needs to issue a series of falling pulses
-      pinMode(powerPin, OUTPUT);    // sets the digital pin as output
-      digitalWrite(rxPin, HIGH); // sets the digital pin on
-      digitalWrite(powerPin, HIGH);  // make sure that the pin off
-      
-      log("-> number of pulses: ", bindMode);
-      //noInterrupts();
-
-      for (int j=0; j<bindMode;j++) {
-        digitalWrite(rxPin, HIGH); // sets the digital pin on
-        delayMicroseconds(BINDING_PULSE_DELAY_MS);            // waits 
-        digitalWrite(rxPin, LOW);  // sets the digital pin  off
-        delayMicroseconds(BINDING_PULSE_DELAY_MS);            // waits 
-      }
-      //digitalWrite(rxPin, HIGH); // sets the digital pin on
-      //interrupts();
-      log("-> number of pulses DONE");
-
-      delay(500);      
-      pinMode(rxPin, INPUT);    // sets the digital pin 13 as input
-      // we need to re-activate the serial interface again
-      delay(500);
-    }
-}
 
 
 template <class T>
@@ -353,14 +316,11 @@ bool SpektrumSatellite<T>::getFrame(){
 
     //  16-byte data packet every 11ms or 22ms, 
     if (available >= 16) {
-      time = millis();
+      timeOfLastRead = millis();
       inByte = serial->readBytes(inData,SEND_BUFFER_SIZE);
       parseFrame(inData);
       // check if the frame is valid
-      result = isInternal ? isValidSystem() && isTransaction() : isTransaction();
-    }
-    // update the status
-    if (result){
+      result = isInternal ? isValidSystem() : true;
       status = Receiving;
     }
 
@@ -382,7 +342,7 @@ void SpektrumSatellite<T>::logFrame(long available, bool result) {
       if (frameCount%mod==0){
         log("getFrame");
         log("available data:",available);
-        log("-> isTransaction:",isTransaction()?"true":"false");
+        log("-> isConnected:",isConnected()?"true":"false");
         log("-> isValidSystem:",isValidSystem()?"true":"false");
         log("-> frameCount:",frameCount);
         log("-> successCount:",successCount);
@@ -596,9 +556,15 @@ void SpektrumSatellite<T>::sendData(){
 }
 
 template <class T>
-bool SpektrumSatellite<T>::isTransaction(){
-  return true; // (millis() - time < TRANSACTION_TIME);
+bool SpektrumSatellite<T>::isConnected(){
+  return isConnected(TRANSACTION_TIME);
 }
+
+template <class T>
+bool SpektrumSatellite<T>::isConnected(long transactionTime){
+  return  (millis() - timeOfLastRead < transactionTime);
+}
+
 
 template <class T>
 void SpektrumSatellite<T>::waitForData(){
@@ -694,5 +660,46 @@ template <class T>
 uint16_t* SpektrumSatellite<T>::getChannelValuesRaw() {
   return channelValues;
 }
+
+/**
+ * The Spektrum Satellite power pin i using 3.3VDC +/-5%, 20mA max. However for the ESP8266 The 
+ * maximum current that can be drawn from a single GPIO pin is 12mA.
+ */
+template <class T>
+void SpektrumSatellite<T>::startBinding(unsigned powerPin, unsigned rxPin) {  
+    // switch off serial interface
+    if(serial) {
+      log("startBinding");
+    
+      pinMode(rxPin, OUTPUT);    // sets the digital pin as output
+      digitalWrite(rxPin, LOW);  // make sure that the pin off
+      delay(1000);
+
+      // To put a receiver into bind mode, within 200ms of power application the host device 
+      // needs to issue a series of falling pulses
+      pinMode(powerPin, OUTPUT);    // sets the digital pin as output
+      digitalWrite(rxPin, HIGH); // sets the digital pin on
+      digitalWrite(powerPin, HIGH);  // make sure that the pin off
+      
+      log("-> number of pulses: ", bindMode);
+      //noInterrupts();
+
+      for (int j=0; j<bindMode;j++) {
+        digitalWrite(rxPin, HIGH); // sets the digital pin on
+        delayMicroseconds(BINDING_PULSE_DELAY_MS);            // waits 
+        digitalWrite(rxPin, LOW);  // sets the digital pin  off
+        delayMicroseconds(BINDING_PULSE_DELAY_MS);            // waits 
+      }
+      //digitalWrite(rxPin, HIGH); // sets the digital pin on
+      //interrupts();
+      log("-> number of pulses DONE");
+
+      delay(500);      
+      pinMode(rxPin, INPUT);    // sets the digital pin 13 as input
+      // we need to re-activate the serial interface again
+      delay(500);
+    }
+}
+
 
 #endif /* SPECTRUMSATELLITE_H_ */
