@@ -12,8 +12,8 @@
  */
 
 #include "SpektrumSatellite.h"
-#include "Servo.h"
 #include "BluetoothSerial.h"
+#include "Servo.h"
 
 
 BluetoothSerial SerialBT;
@@ -33,19 +33,18 @@ void setup() {
 
   // Activate the loggin to the console only if SpektrumSatellite is not using Serial
   satellite.setLog(Serial);
-  // we can define the requested binding mode
-  satellite.setBindingMode(External_DSM2_11ms);
 
   //scale the values from 0 to 180 degrees for PWM
   satellite.setChannelValueRange(0, 180);
-
-  // wait forever for data
-  satellite.waitForData();
   
   // setup PWM pins
   for (int j=0;j<pins; j++){
     servos[j].attach(pwmPins[j]);
   }
+
+  // wait for first data
+  satellite.waitForData();
+
 }
 
 void loop() {
@@ -56,8 +55,10 @@ void loop() {
        long value = satellite.getChannelValue(ch);
        servos[j].write(value);
     }        
-  } else {
-    // if we loose the connection we set the values to neutral 
+  } 
+  
+  // if we loose the connection we set the values to neutral 
+  if (!satellite.isConnected()) {
     satellite.log("Invoking fail save values");   
     for (int j=0;j<pins; j++){
        servos[j].write(failSaveValues[j]);

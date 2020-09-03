@@ -20,6 +20,10 @@ The following usage scenarios are supported and documented with examples
  - Receive Serial Satellite Data and send it as CSV e.g. via UDP (GatewayCSV)
 (SendUDP)
 
+## Basic Syntax
+The SpektrumSatellite class expects a Stream (HardwareSerial, SoftwareSerial, UDP etc) as parameter.  You need to make sure that you set the exected baud rate (e.g. with Serial.begin(SPEKTRUM_SATELLITE_BPS)). 
+
+
 ## Example: Implementing a Remote Control
 
 In this Example we use of the SpektrumSatellite class to read the data from analog lines and send it via Bloothooth: With this we can implement a simple custom remote control running on a ESP32 which reads the joystick values and sends them out to a receiver.
@@ -88,7 +92,78 @@ void loop() {
 }
 
 ```
+## Example: Implementing the Receiver on the RC Airplane
 
+In the following Example we use the SpektrumSatellite class on an Arduino Nano with the HC-05 Bluetooth module to receive the  data in order to update the servos. 
+
+We use SoftwareSerial instead of the built in Serial interface so that we can keep the logging functionality to the console.
+
+```
+#include <SoftwareSerial.h>
+#include "SpektrumSatellite.h"
+#include "Servo.h"
+
+SoftwareSerial SpektrumSerial(12, 13); // connect TX only after checking the voltage!
+SpektrumSatellite<uint16_t> satellite(SpektrumSerial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+const int pins = 6;  // number of channels for servos
+Servo servos[pins];  // allocate servos for all channels
+int pwmPins[] = {2, 0, 4, 5, 6, 7};  // servo pins 
+int failSaveValues[] = {0,90,90,90,90,90}; // neutrol positions
+
+
+void setup() {
+  SpektrumSerial.begin(9600);
+
+  // Log
+  Serial.begin(115200);
+  Serial.println();
+  Serial.println("setup");
+
+  // Activate the loggin to the console only if SpektrumSatellite is not using Serial
+  satellite.setLog(Serial);
+
+  //scale the values from 0 to 180 degrees for PWM
+  satellite.setChannelValueRange(0, 180);
+
+  
+  // setup PWM pins
+  for (int j=0;j<pins; j++){
+    servos[j].attach(pwmPins[j]);
+  }
+
+  // we use the built in LED
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN,LOW);
+
+  // wait forever for data
+  satellite.waitForData();
+
+  Serial.println("setup - DONE!");
+}
+
+void loop() {
+  
+  if (satellite.getFrame()) {   
+    for (int j=0;j<pins; j++){
+       Channel ch = static_cast<Channel>(j);   
+       long value = satellite.getChannelValue(ch);
+       servos[j].write(value);
+    }        
+    digitalWrite(LED_BUILTIN,HIGH);
+  } 
+
+  // if we loose the connection we set the values to neutral 
+  if (!satellite.isConnected()) {
+    satellite.log("Invoking fail save values");   
+    for (int j=0;j<pins; j++){
+       servos[j].write(failSaveValues[j]);
+    }        
+    digitalWrite(LED_BUILTIN,LOW);
+  }
+  
+}
+
+```
 
 
 
