@@ -1,5 +1,5 @@
 /**
- * Example Use of the SpektrumSatellite to receive data:
+ * Example Use of the SpektrumSatellite to receive CSV data via Bluetooth:
  * 
  * Please check and adapt the pin assignments for your Microcontroller.
  * If you activate the logging the Serial port used by the SpektrumSatellite must
@@ -13,17 +13,21 @@
 
 #include "SpektrumSatellite.h"
 #include "Servo.h"
+#include "BluetoothSerial.h"
 
-SpektrumSatellite<uint16_t> satellite(Serial2); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+
+BluetoothSerial SerialBT;
+SpektrumSatellite<uint16_t> satellite(SerialBT); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+SpektrumCSV<uint16_t>  csv(',',false);
 const int pins = 6;  // number of channels for servos
 Servo servos[pins];  // allocate servos for all channels
 int pwmPins[] = {16, 5, 4, 0, 10, 9};  // servo pins 
-int rxPin = 3; // pin for receiving data from serial1
 int failSaveValues[] = {0,90,90,90,90,90}; // neutrol positions
 
 
 void setup() {
-  Serial2.begin(SPEKTRUM_SATELLITE_BPS);
+  SerialBT.begin("Airplane");
+
   Serial.begin(115200);
   Serial.println();
   Serial.println("setup");
@@ -46,8 +50,9 @@ void setup() {
 }
 
 void loop() {
-  
-  if (satellite.getFrame()) {   
+  String str = SerialBT.readStringUntil('\n');  
+
+  if (csv.parseLine(str,satellite)) {   
     for (int j=0;j<pins; j++){
        Channel ch = static_cast<Channel>(j);   
        long value = satellite.getChannelValue(ch);

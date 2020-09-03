@@ -14,23 +14,26 @@ template <class T>
 class SpektrumCSV {
     public:
         SpektrumCSV();
-        SpektrumCSV(char delimiter);
+        SpektrumCSV(char delimiter, bool isTranslated);
         void toString(SpektrumSatellite<T> &satellite, uint8_t* dataSting, unsigned int maxLen);
-        void parse(uint8_t* str, SpektrumSatellite<T> &satellite);
+        bool parse(uint8_t* str, SpektrumSatellite<T> &satellite);
         void setFactor(double factor);
     private:
       char delimiter;
+      bool isTranslated;
       char* findEnd(char* start);
 };
 
 template <class T>
 SpektrumCSV<T>::SpektrumCSV(){
     this->delimiter = ',';
+    this->isTranslated = true;
 }
 
 template <class T>
-SpektrumCSV<T>::SpektrumCSV(char delimiter){
+SpektrumCSV<T>::SpektrumCSV(char delimiter, bool isTranslated){
     this->delimiter = delimiter;
+    this->isTranslated = isTranslated;
 }
 
 
@@ -41,7 +44,7 @@ template <class T>
 void SpektrumCSV<T>::toString(SpektrumSatellite<T> &satellite, uint8_t* str, unsigned int len) {
     uint8_t* start = str;
     for (int j=0; j < MAX_CHANNELS; j++){
-        float val = satellite.getChannelValue((Channel)j);
+        float val = isTranslated ?  satellite.getChannelValue((Channel)j): satellite.getChannelValuesRaw[(Channel)j];
         int len = sprintf((char*)start, "%.2f", val);
         start+=len;
         if (j<MAX_CHANNELS-1){
@@ -56,17 +59,24 @@ void SpektrumCSV<T>::toString(SpektrumSatellite<T> &satellite, uint8_t* str, uns
  * Parse tab seperated values
  */
 template <class T>
-void SpektrumCSV<T>::parse(uint8_t* str, SpektrumSatellite<T> &satellite){
+bool SpektrumCSV<T>::parse(uint8_t* str, SpektrumSatellite<T> &satellite){
+    bool result = false;
     char* start = (char*)str;
     for (int j=0; j< MAX_CHANNELS; j++){
         char* end = findEnd(start);
         if (end==NULL){
             break;
         }
+        result = true;
         double value = strtod(start, &end);
-        satellite.setChannelValue((Channel)j, value);
+        if (isTranslated){
+            satellite.setChannelValue((Channel)j, value);
+        } else {
+            satellite.getChannelValuesRaw[(Channel)j] = value;
+        }
         start = end+1;
     }
+    return result;
 }
 
 template <class T>

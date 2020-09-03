@@ -21,6 +21,7 @@
 #define MASK_2048_SXPOS 0x07FF 
 #define SEND_BUFFER_SIZE 16
 #define BINDING_PULSE_DELAY_MS 100
+#define SPEKTRUM_SATELLITE_BPS 125000
 
 
 // Defines the number of falling pulses when Binding
@@ -68,7 +69,6 @@ enum System {
 
 #include "Arduino.h"
 #include "Scaler.h"
-#include "SpektrumCSV.h"
 
 
 
@@ -76,7 +76,7 @@ template <class T>
 class SpektrumSatellite {
   public:
     // Constructor
-    SpektrumSatellite(HardwareSerial &serial); 
+    SpektrumSatellite(Stream &serial); 
     
     // Defines the binding mode  
     void setBindingMode(BindMode bindMode); 
@@ -119,7 +119,7 @@ class SpektrumSatellite {
 
     byte* getSendBuffer(boolean auxData);
     byte* getSendBuffer();
-    void sendData(Stream& out);
+    void sendData();
     
     // Checks that we did not time out
     bool isTransaction();
@@ -179,16 +179,15 @@ class SpektrumSatellite {
     boolean isInternal;
     boolean isSendAuxData;
     
-    HardwareSerial *serial;
+    Stream *serial;
     Stream *serialLog = NULL;
     Scaler<T> scaler;
     BindMode bindMode; 
     Status status;   
     
     // private methods
-    void setupSerial();
     boolean isValidSystem();
-    void logFrame(boolean result);
+    void logFrame(long available, bool result);
 };
 
 // 12 channels
@@ -208,18 +207,13 @@ const static char* ChannelNames[] = {
 };
 
 template <class T>
-SpektrumSatellite<T>::SpektrumSatellite(HardwareSerial& serial) {
+SpektrumSatellite<T>::SpektrumSatellite(Stream& serial) {
     // Internal_DSMx_11ms is recommended bind value
     this->serial = &serial;
     setBindingMode(Internal_DSMx_11ms);
-    if (!serial) {
-      setupSerial();
-    }
+
     // setup Initial Status
     this->status = NotConnected;
-    //if (isReceivingData(1000)){
-    //  this->status = Receiving;    
-    //}
 }
 
 template <class T>
@@ -289,9 +283,6 @@ void SpektrumSatellite<T>::startBinding(unsigned powerPin, unsigned rxPin) {
     // switch off serial interface
     if(serial) {
       log("startBinding");
-
-      serial->end();
-      delay(500);
     
       pinMode(rxPin, OUTPUT);    // sets the digital pin as output
       digitalWrite(rxPin, LOW);  // make sure that the pin off
@@ -320,19 +311,9 @@ void SpektrumSatellite<T>::startBinding(unsigned powerPin, unsigned rxPin) {
       pinMode(rxPin, INPUT);    // sets the digital pin 13 as input
       // we need to re-activate the serial interface again
       delay(500);
-      setupSerial();
-      delay(500);      
     }
 }
 
-template <class T>
-void SpektrumSatellite<T>::setupSerial(void) {
-  //  125000bps, 8 bits, No parity, 1 stop (8N1). 
-  if (serial) {
-     log("setupSerial");
-     serial->begin(125000, SERIAL_8N1);
-  }
-}
 
 template <class T>
 bool SpektrumSatellite<T>::parseFrame(byte* inData){
@@ -367,11 +348,11 @@ template <class T>
 bool SpektrumSatellite<T>::getFrame(){
     short inByte;
     byte inData[SEND_BUFFER_SIZE];
-    boolean result = false;
-    log("available data:",serial->available());
-    
+    bool result = false;
+    long available = serial->available();
+
     //  16-byte data packet every 11ms or 22ms, 
-    if (serial->available() >= 16) {
+    if (available >= 16) {
       time = millis();
       inByte = serial->readBytes(inData,SEND_BUFFER_SIZE);
       parseFrame(inData);
@@ -384,26 +365,36 @@ bool SpektrumSatellite<T>::getFrame(){
     }
 
     // log the status
-    logFrame(result);    
+    logFrame(available, result);    
     
     return result;
 }
 
 template <class T>
-void SpektrumSatellite<T>::logFrame(boolean result) {
+void SpektrumSatellite<T>::logFrame(long available, bool result) {
     if (result) {
       successCount++;
     } else {
       failCount++;
     }
-    long mod = getStatus()==Receiving ? 1000 : 1;
-    if (frameCount%mod==0){
-      log("getFrame");
-      log("-> isTransaction:",isTransaction()?"true":"false");
-      log("-> isValidSystem:",isValidSystem()?"true":"false");
-      log("-> frameCount:",frameCount);
-      log("-> successCount:",successCount);
-      log("-> failCount:",failCount);
+    long mod = 1000;
+    if (getStatus()==Receiving){
+      if (frameCount%mod==0){
+        log("getFrame");
+        log("available data:",available);
+        log("-> isTransaction:",isTransaction()?"true":"false");
+        log("-> isValidSystem:",isValidSystem()?"true":"false");
+        log("-> frameCount:",frameCount);
+        log("-> successCount:",successCount);
+        log("-> failCount:",failCount);
+      } 
+    } else {
+      if (serialLog!=NULL) {
+        serialLog->print(available>0 ? "+" : ".");
+        if (frameCount%mod==0){
+          serialLog->println();
+        }
+      }
     }
     frameCount++;
 }
@@ -587,23 +578,24 @@ byte *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
 
 
 template <class T>
-void SpektrumSatellite<T>::sendData(Stream& out){
-  uint16_t* data = getSendBuffer();
+void SpektrumSatellite<T>::sendData(){
+  uint16_t* data = (uint16_t*) getSendBuffer();
   for (int j=0;j<8;j++){
-    out.write(data[j]);
+    serial->write(data[j]);
   }
 
   // send Aux if necessary
   if (isSendAuxData){ 
+    uint16_t* data = (uint16_t*) getSendBuffer(true);
     for (int j=0;j<8;j++){
-      out.write(data[j]);
+      serial->write(data[j]);
     }
   }
 }
 
 template <class T>
 bool SpektrumSatellite<T>::isTransaction(){
-  return (millis() - time < TRANSACTION_TIME);
+  return true; // (millis() - time < TRANSACTION_TIME);
 }
 
 template <class T>

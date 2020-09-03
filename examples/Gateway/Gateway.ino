@@ -29,12 +29,13 @@ unsigned long intervall = 500;            // send every 500ms (=2 messages per s
 unsigned long intervallTime;
 uint8_t* buffer = new uint8_t[10*MAX_CHANNELS+1];
 
-SpektrumSatellite<float> satellite(Serial); // we use doubles!
+SpektrumSatellite<float> satellite(Serial2); // we use doubles!
 SpektrumCSV<float> csv(',');
 WiFiUDP udp;
 
 
 void setup() {
+  Serial2.begin(SPEKTRUM_SATELLITE_BPS);
   Serial.begin(115200);
   Serial.println();
   Serial.println("setup");
@@ -56,7 +57,7 @@ void loop() {
     if (satellite.getFrame()) {   
       // send via UDP
       udp.beginPacket(udpAddress, udpPort);
-      udp.write(satellite.getSendBuffer(), SEND_BUFFER_SIZE);
+      satellite.sendData();
       udp.endPacket();
     } 
   }

@@ -1,5 +1,4 @@
 
-
 /**
  * Example Use of the SpektrumSatellite class to read the data from analog lines and 
  * send it via UDP. 
@@ -13,17 +12,13 @@
  */
 
 #include "SpektrumSatellite.h"
+#include "SpektrumCSV.h"
 
 #ifdef ESP32
   #include <WiFi.h>
   #include <WiFiUdp.h>
 #else
-#ifdef ESP8266
-  #include <ESP8266WiFi.h>
-  #include <WiFiUdp.h>
-#else
     #error "This demo requires an ESP32 or ESP8266 -> Please convert the sketch to your board"
-#endif
 #endif
 
 
@@ -37,7 +32,7 @@ WiFiUDP udp;
 uint8_t* buffer = new uint8_t[10*MAX_CHANNELS+1];
 
 SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
-SpektrumCSV<uint16_t> csv(',');
+SpektrumCSV<uint16_t> csv;
 
 const int pins = 6;  // number of channels for servos
 int inPins[] = {16, 5, 4, 0, 10, 9};  // analog input pins 
@@ -82,9 +77,8 @@ void loop() {
 
     // send binary data
     udp.beginPacket(udpAddress, udpPort);
-    udp.write(satellite.getSendBuffer(), SEND_BUFFER_SIZE);
+    //udp.write(satellite.getSendBuffer(), SEND_BUFFER_SIZE);
+    satellite.sendData();
     udp.endPacket();
   } 
 }
-
-#endif

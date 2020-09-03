@@ -10,20 +10,20 @@
  * 
  */
 
-SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+SpektrumSatellite<uint16_t> satellite(Serial2); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
 const int pins = 6;  // number of channels for servos
 int inPins[] = {16, 5, 4, 0, 10, 9};  // analog input pins 
 
 
 void setup() {
 
+  Serial2.begin(SPEKTRUM_SATELLITE_BPS);
   Serial.begin(115200);
-  Serial1.begin(115200);
-  Serial1.println();
-  Serial1.println("setup");
+  Serial.println();
+  Serial.println("setup");
 
   // Activate the logging to the console only if SpektrumSatellite is not using Serial
-  satellite.setLog(Serial1);
+  satellite.setLog(Serial);
   // we can define the requested binding mode
   satellite.setBindingMode(External_DSM2_11ms);
 
@@ -44,6 +44,6 @@ void loop() {
 	  satellite.setChannelValue(channel, analogRead(inPins[j]));
 	}
   // send binary data
-	satellite.sendData(Serial);
+	satellite.sendData();
   
 }

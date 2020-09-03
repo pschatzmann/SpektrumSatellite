@@ -14,7 +14,7 @@
 
 SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
 int rxPin = 3; // pin for receiving data from serial1
-int powerPin = 5; // pin for powering the Satellite
+int powerPin = 36; // pin for powering the Satellite
 
 
 void setup() {
