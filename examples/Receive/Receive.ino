@@ -53,12 +53,14 @@ void loop() {
        long value = satellite.getChannelValue(ch);
        servos[j].write(value);
     }        
-  } else {
+  } 
     // if we loose the connection we set the values to neutral 
+  if (satellite.isConnected()) {
     satellite.log("Invoking fail save values");   
     for (int j=0;j<pins; j++){
-       servos[j].write(failSaveValues[j]);
+      servos[j].write(failSaveValues[j]);
     }        
   }
+  
   
 }
