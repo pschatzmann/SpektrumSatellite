@@ -25,7 +25,6 @@
 char* ssid = "RemoteControl";                 //Change this to your router SSID.
 char* password =  "password123";        //Change this to your router password.
 const int udpPort = 6789;
-uint8_t* buffer = new uint8_t[10*MAX_CHANNELS+1];
 IPAddress gateway(192,168,4,0);
 IPAddress subnet(255,255,255,0);   
 IPAddress local_IP(192,168,4,2); 
@@ -37,7 +36,7 @@ SpektrumCSV<uint16_t> csv;
 const int pins = 6;  // number of channels for servos
 int pwmPins[] = {2, 0, 4, 5, 6, 7};  // servo pins 
 Servo servos[pins];  // allocate servos for all channels
-
+uint8_t buffer[1024];
 
 
 void setup() {
@@ -86,7 +85,7 @@ void loop() {
       // log data as CSV to console
       csv.toString(satellite, buffer, 1024);
       satellite.sendData(buffer);   
-      Serial.println((char*)buffer);       
+      Serial.print((char*)buffer);       
     } 
   }
   

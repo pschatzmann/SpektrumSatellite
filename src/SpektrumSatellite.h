@@ -544,7 +544,7 @@ byte *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
 
 template <class T>
 void SpektrumSatellite<T>::sendData(){
-  if (sendCount++%logMod==0){
+  if (sendCount>0 && sendCount++%logMod==0){
     log("sendData");
   }
   uint16_t* data = (uint16_t*) getSendBuffer();
@@ -559,7 +559,7 @@ void SpektrumSatellite<T>::sendData(){
 
 template <class T>
 void SpektrumSatellite<T>::sendData(uint8_t* str){
-  if (sendCount++%logMod==0){
+  if (logMod>0 && sendCount++%logMod==0){
     log((char*)str);
   }
   serial->print((char*)str);

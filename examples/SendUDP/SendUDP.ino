@@ -35,13 +35,13 @@ const int udpPort = 6789;
 unsigned long intervall = 500;  // send every 500ms (=2 messages per second)
 unsigned long intervallTime;
 WiFiUDP udp;
-uint8_t* buffer = new uint8_t[10*MAX_CHANNELS+1];
 
 SpektrumSatellite<uint16_t> satellite(udp); // Assigning the Sattelite to use UDP
 SpektrumCSV<uint16_t> csv;
 
 const int pins = 6;  // number of channels for servos
 int inPins[] = {16, 5, 4, 0, 10, 9};  // analog input pins 
+uint8_t buffer[1024];
 
 void setup() {
   Serial.begin(115200);
@@ -60,10 +60,8 @@ void setup() {
 
   // Activate the logging to the console only if SpektrumSatellite is not using Serial
   satellite.setLog(Serial);
-  satellite.setLogMod(1); // log every record
-  // we can define the requested binding mode
-  satellite.setBindingMode(External_DSM2_11ms);
-  
+  satellite.setLogMod(0); // do not log records
+ 
   // setup Input pins
   for (int j=0;j<pins; j++){
   	pinMode(inPins[j],INPUT);
@@ -84,8 +82,14 @@ void loop() {
 
     // send binary data
     udp.beginPacket(target_IP, udpPort);
-    //udp.write(satellite.getSendBuffer(), SEND_BUFFER_SIZE);
     satellite.sendData();
     udp.endPacket();
+
+    // log data as CSV to console
+    csv.toString(satellite, buffer, 1024);
+    satellite.sendData(buffer);   
+    Serial.print((char*)buffer);      
+
+
   } 
 }
