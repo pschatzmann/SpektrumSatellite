@@ -21,7 +21,6 @@ SpektrumSatellite<uint16_t> satellite(SerialBT); // Assing satellite to Serial (
 const int pins = 6;  // number of channels for servos
 Servo servos[pins];  // allocate servos for all channels
 int pwmPins[] = {16, 5, 4, 0, 10, 9};  // servo pins 
-int failSaveValues[] = {0,90,90,90,90,90}; // neutrol positions
 
 
 void setup() {
@@ -57,12 +56,5 @@ void loop() {
     }        
   } 
   
-  // if we loose the connection we set the values to neutral 
-  if (!satellite.isConnected()) {
-    satellite.log("Invoking fail save values");   
-    for (int j=0;j<pins; j++){
-       servos[j].write(failSaveValues[j]);
-    }        
-  }
   
 }

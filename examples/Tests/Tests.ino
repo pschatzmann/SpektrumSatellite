@@ -4,6 +4,7 @@
  */
 
 #include "SpektrumSatellite.h"
+#include "SpektrumCSV.h"
 #include "Scaler.h"
 
 void testScaling() {
@@ -86,7 +87,7 @@ void testCSV() {
   Serial.println("***********************");
   Serial.println("testCSV");
   SpektrumSatellite<uint16_t> satellite(Serial); 
-  SpektrumCSV<uint16_t> csv(',');
+  SpektrumCSV<uint16_t> csv;
   satellite.setChannelValueRange(0, 11);
 
   for (int j=0;j<MAX_CHANNELS;j++){
@@ -102,10 +103,11 @@ void testCSV() {
   Serial.print("testCSV toString => ");
   Serial.println(strcmp((char*)buffer,expected)==0 ? "ok" : "failed");
 
-
+  // reset vlues
   for (int j=0;j<MAX_CHANNELS;j++){
       satellite.setChannelValue((Channel)j,0);
   }
+  // read csv values
   csv.parse(buffer, satellite);
 
   // check the data
@@ -116,7 +118,6 @@ void testCSV() {
       Serial.print(satellite.getChannelValue((Channel)j));
       Serial.println(satellite.getChannelValue((Channel)j) == j ? " OK" : " Error");
   }
-
 }
 
 void testBinary() {
@@ -156,6 +157,33 @@ void testWaitForData() {
 
 }
 
+void testHeader() {
+  Serial.println("***********************");
+  Serial.println("testHeader ");
+  SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+  satellite.setSystem(DSMS_22MS_2048);
+  Serial.print("system ->");
+  Serial.println(satellite.getSystem()==DSMS_22MS_2048?"OK":"Error");
+  byte* buffer = satellite.getSendBuffer(false);
+  Serial.print("buffer: ");
+  Serial.print(buffer[0]);
+  Serial.print(" ");
+  Serial.println(buffer[1]);
+
+  satellite.parseFrame(buffer);
+
+  Serial.print("system: ");
+  Serial.println(satellite.getSystem());
+
+  Serial.print("system ->");
+  Serial.println(satellite.getSystem()==DSMS_22MS_2048?"OK":"Error");
+  Serial.print("isValidSystem ->");
+  Serial.println(satellite.isValidSystem()?"OK":"Error");
+  Serial.print("system ->");
+  Serial.println(satellite.getFades()==0?"OK":"Error");
+
+}
+
 
 void setup() {
   Serial.begin(115200);
@@ -168,6 +196,7 @@ void setup() {
   testIs1024();
   testRange1000();
   testFloat();
+  testHeader();
   testCSV();
   testBinary();
   testWaitForData();

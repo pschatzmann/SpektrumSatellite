@@ -13,9 +13,8 @@ template <class T> class SpektrumSatellite;
 template <class T> 
 class SpektrumCSV {
     public:
-        SpektrumCSV();
-        SpektrumCSV(char delimiter, bool isTranslated);
-        void toString(SpektrumSatellite<T> &satellite, uint8_t* dataSting, unsigned int maxLen);
+        SpektrumCSV(char delimiter=',', bool isTranslated=true);
+        void toString(SpektrumSatellite<T> &satellite, uint8_t dataSting[], uint16_t maxLen);
         bool parse(uint8_t* str, SpektrumSatellite<T> &satellite);
         void setFactor(double factor);
     private:
@@ -23,12 +22,6 @@ class SpektrumCSV {
       bool isTranslated;
       char* findEnd(char* start);
 };
-
-template <class T>
-SpektrumCSV<T>::SpektrumCSV(){
-    this->delimiter = ',';
-    this->isTranslated = true;
-}
 
 template <class T>
 SpektrumCSV<T>::SpektrumCSV(char delimiter, bool isTranslated){
@@ -41,10 +34,10 @@ SpektrumCSV<T>::SpektrumCSV(char delimiter, bool isTranslated){
  * Convert to tab seperated values
  */
 template <class T>
-void SpektrumCSV<T>::toString(SpektrumSatellite<T> &satellite, uint8_t* str, unsigned int len) {
+void SpektrumCSV<T>::toString(SpektrumSatellite<T> &satellite, uint8_t str[], uint16_t len) {
     uint8_t* start = str;
     for (int j=0; j < MAX_CHANNELS; j++){
-        float val = isTranslated ?  satellite.getChannelValue((Channel)j): satellite.getChannelValuesRaw[(Channel)j];
+        float val = isTranslated ?  satellite.getChannelValue((Channel)j): satellite.getChannelValuesRaw()[(Channel)j];
         int len = sprintf((char*)start, "%.2f", val);
         start+=len;
         if (j<MAX_CHANNELS-1){
@@ -63,6 +56,7 @@ bool SpektrumCSV<T>::parse(uint8_t* str, SpektrumSatellite<T> &satellite){
     bool result = false;
     char* start = (char*)str;
     for (int j=0; j< MAX_CHANNELS; j++){
+        Channel ch = (Channel) j;
         char* end = findEnd(start);
         if (end==NULL){
             break;
@@ -70,9 +64,9 @@ bool SpektrumCSV<T>::parse(uint8_t* str, SpektrumSatellite<T> &satellite){
         result = true;
         double value = strtod(start, &end);
         if (isTranslated){
-            satellite.setChannelValue((Channel)j, value);
+            satellite.setChannelValue(ch, value);
         } else {
-            satellite.getChannelValuesRaw[(Channel)j] = value;
+            satellite.getChannelValuesRaw()[j] = value;
         }
         start = end+1;
     }

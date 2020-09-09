@@ -67,9 +67,18 @@ enum System {
    DSMX_11MS_2048=0xb2  
 };
 
+// Header of a frame
+union Header {
+  uint16_t fades;
+  struct __attribute__((__packed__)) Internal {
+    byte fades;
+    byte system;
+  } internal;
+};
+
+
 #include "Arduino.h"
 #include "Scaler.h"
-
 
 
 template <class T>
@@ -117,6 +126,7 @@ class SpektrumSatellite {
     void setAux7(T value);
 
     void sendData();
+    void sendData(uint8_t* str);
     
     // Checks that we did not time out
     bool isConnected();
@@ -145,6 +155,8 @@ class SpektrumSatellite {
     
     // Determines the system
     System getSystem();
+    boolean isValidSystem(int system);
+    boolean isInternal();
 
     // checks if the biggest number is 2048 (instead of 1024)
     bool is2048();
@@ -154,15 +166,15 @@ class SpektrumSatellite {
 
     Status getStatus();
     
-
-
     // == usually not needed but in case when you need to access the data
     bool parseFrame(byte* inData);
     byte* getSendBuffer(boolean auxData);
     byte* getSendBuffer();
     // logging
     void setLog(Stream& log);
+    void setLogMod(long value);
     void log(const char*);
+    void log1(const char*);
     void log(const char*, const char*);
     void log(const char*, int value);
     void logHex(const char*, int value);
@@ -177,11 +189,12 @@ class SpektrumSatellite {
     unsigned long successCount;
     unsigned long failCount;
     unsigned long frameCount;
+    unsigned long sendCount;
     uint16_t maskCHANID;
     uint16_t maskVALUE;
     uint16_t fades;
     System system;
-    boolean isInternal;
+    boolean isInternalFlag;
     boolean isSendAuxData;
     
     Stream *serial;
@@ -189,9 +202,9 @@ class SpektrumSatellite {
     Scaler<T> scaler;
     BindMode bindMode; 
     Status status;   
+    long logMod = 1000;
     
     // private methods
-    boolean isValidSystem();
     void logFrame(long available, bool result);
 };
 
@@ -210,6 +223,7 @@ const static char* ChannelNames[] = {
   "Aux6",
   "Aux7"
 };
+
 
 template <class T>
 SpektrumSatellite<T>::SpektrumSatellite(Stream& serial) {
@@ -248,12 +262,12 @@ void SpektrumSatellite<T>::setBindingMode(BindMode bindMode) {
   }
 
   if (bindMode == Internal_DSM2_11ms || bindMode == Internal_DSM2_22ms || bindMode == Internal_DSMx_11ms || bindMode == Internal_DSMx_22ms ){
-    isInternal = true;
+    isInternalFlag = true;
   } else {
-    isInternal = false;
+    isInternalFlag = false;
   }
 
-  log("-> isInternal:", isInternal ? "true":"false");
+  log("-> isInternal:", isInternal() ? "true":"false");
   logHex("-> system:", system);
   
 }
@@ -265,16 +279,35 @@ System SpektrumSatellite<T>::getSystem(){
 
 template <class T>
 void SpektrumSatellite<T>::setSystem(System system){
-  logHex("setSystem:", system);
+  if (this->system!=system)
+    logHex("setSystem:", system);
   this->system = system;
-
 }
 
 template <class T>
-boolean SpektrumSatellite<T>::isValidSystem() {
-  boolean result = system == 0x01 || system == 0x12 || system == 0xa2 || system == 0xb2; 
-  if (!result)
-    log("isValidSystem: ",result ? "true":"false");
+boolean SpektrumSatellite<T>::isInternal() {
+  return this->isInternalFlag;
+}
+
+template <class T>
+boolean SpektrumSatellite<T>::isValidSystem(int system) {
+  bool result = false;
+  if (isInternal()) {
+    // check system
+    if (system == DSM2_22MS_1024
+     || system == DSM2_11MS_2048
+     || system == DSMS_22MS_2048
+     || system == DSMX_11MS_2048 ){
+        result = true;
+     }
+    if (!result) {
+      log("isValidSystem: ",result ? "true":"false");
+      logHex("system: ",system);
+    }
+  } else {
+    // system has no meaning
+    result = true;
+  }
   return result;  
 }
 
@@ -283,11 +316,13 @@ bool SpektrumSatellite<T>::parseFrame(byte* inData){
   uint16_t* inData16 =  (uint16_t*) inData;
     // a frame is 16 bytes -> 7 channels + fades
     // determine system and fades
-    if (isInternal){
-        fades = inData[0];
-        system = (System)inData[1];
+    Header* header = (Header*) inData;
+    if (isInternal()){
+        this->fades = header->internal.fades;
+        if (isValidSystem(header->internal.system))
+          this->system = (System) (header->internal.system);
     } else {
-        fades = inData16[0];
+        this->fades = header->fades;
     }
 
     uint16_t channelShift = is2048() ? 11 : 10;  
@@ -296,7 +331,6 @@ bool SpektrumSatellite<T>::parseFrame(byte* inData){
       short inValue = inData16[i];
       short channelID = (inValue & maskCHANID)>>channelShift;
       short channelValue = inValue & maskVALUE;
-
       if (channelID>=0 && channelID<MAX_CHANNELS) {
         channelValues[channelID] = channelValue; 
       } else {
@@ -320,43 +354,15 @@ bool SpektrumSatellite<T>::getFrame(){
       inByte = serial->readBytes(inData,SEND_BUFFER_SIZE);
       parseFrame(inData);
       // check if the frame is valid
-      result = isInternal ? isValidSystem() : true;
+      result = isValidSystem(this->system);
       status = Receiving;
+
+      // log the status
+      logFrame(available, result);    
     }
 
-    // log the status
-    logFrame(available, result);    
     
     return result;
-}
-
-template <class T>
-void SpektrumSatellite<T>::logFrame(long available, bool result) {
-    if (result) {
-      successCount++;
-    } else {
-      failCount++;
-    }
-    long mod = 1000;
-    if (getStatus()==Receiving){
-      if (frameCount%mod==0){
-        log("getFrame");
-        log("available data:",available);
-        log("-> isConnected:",isConnected()?"true":"false");
-        log("-> isValidSystem:",isValidSystem()?"true":"false");
-        log("-> frameCount:",frameCount);
-        log("-> successCount:",successCount);
-        log("-> failCount:",failCount);
-      } 
-    } else {
-      if (serialLog!=NULL) {
-        serialLog->print(available>0 ? "+" : ".");
-        if (frameCount%mod==0){
-          serialLog->println();
-        }
-      }
-    }
-    frameCount++;
 }
 
 
@@ -508,18 +514,7 @@ byte *SpektrumSatellite<T>::getSendBuffer() {
 
 template <class T>
 byte *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
-
-    // if the mode is internal we need to add the system id
-    if (isInternal) {
-      // limit number of fades to maximum value to prevent conflicts
-      // with the system info
-      if (this->fades>0xFF){
-        fades = 0xFF;
-      }
-      sendValues[0] = this->fades << 8 | system;      
-    }{
-      sendValues[0] = this->fades;
-    }
+    memset(sendValues,0,sizeof(sendValues));
 
     // determine the position of the index info
     uint16_t channelShift = is2048() ? 11 : 10;  
@@ -533,27 +528,44 @@ byte *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
         sendValues[j+1] = channelValues[j] & maskVALUE | j<<channelShift;
       }
     }
+
+    // if the mode is internal we need to add the system id
+    Header* header = (Header*)sendValues;
+    if (isInternal()) {
+      header->internal.fades = this->fades;
+      header->internal.system = this->system;
+    } else {
+      header->fades = this->fades;
+    }
+
     return (byte*)sendValues;
 }
 
 
 template <class T>
 void SpektrumSatellite<T>::sendData(){
-  uint16_t* data = (uint16_t*) getSendBuffer();
-  for (int j=0;j<8;j++){
-    serial->write(data[j]);
+  if (sendCount++%logMod==0){
+    log("sendData");
   }
-  serial->flush();
+  uint16_t* data = (uint16_t*) getSendBuffer();
+  serial->write((uint8_t*)data,SEND_BUFFER_SIZE);
 
   // send Aux if necessary
   if (isSendAuxData){ 
     uint16_t* data = (uint16_t*) getSendBuffer(true);
-    for (int j=0;j<8;j++){
-      serial->write(data[j]);
-    }
-    serial->flush();
+    serial->write((uint8_t*)data,SEND_BUFFER_SIZE);
   }
 }
+
+template <class T>
+void SpektrumSatellite<T>::sendData(uint8_t* str){
+  if (sendCount++%logMod==0){
+    log((char*)str);
+  }
+  serial->print((char*)str);
+  serial->flush();
+}
+
 
 template <class T>
 bool SpektrumSatellite<T>::isConnected(){
@@ -569,32 +581,11 @@ bool SpektrumSatellite<T>::isConnected(long transactionTime){
 template <class T>
 void SpektrumSatellite<T>::waitForData(){
   log("waitForData");
-  boolean validData = false;
-  while(!validData) {
-      validData = getFrame();
+  while(!serial->available()) {
+      log1(".");
       delay(1000);
   }
 }
-
-// template <class T>
-// bool SpektrumSatellite<T>::isReceivingData(unsigned long timeOut) {
-//   bool result = false;
-//   unsigned long start = millis();
-//   while(!result) {
-//       result = getFrame();
-//       if (millis() - start > timeOut){
-//         break;
-//       }
-//       delay(1000);
-//   }
-//   log("isReceivingData:",result?"true":"false");
-//   return result;
-// }
-
-// template <class T>
-// bool SpektrumSatellite<T>::isReceivingData(){
-//   return isReceivingData(DEFAULT_RECEIVING_TIMEOUT);  // 10 sec
-// }
 
 template <class T>
 void SpektrumSatellite<T>::setChannelValueRange(T min, T max){
@@ -636,6 +627,13 @@ void SpektrumSatellite<T>::log(const char* str, const char* str1) {
 }
 
 template <class T>
+void SpektrumSatellite<T>::log1(const char* str) {
+  if (serialLog==NULL) return;
+  serialLog->print(" ");
+}
+
+
+template <class T>
 void SpektrumSatellite<T>::log(const char* str, int value) {
   if (serialLog==NULL) return;
   serialLog->print(str);
@@ -650,6 +648,40 @@ void SpektrumSatellite<T>::logHex(const char* str, int value) {
   serialLog->print(" ");
   serialLog->println(value,HEX);
 }
+
+template <class T>
+void SpektrumSatellite<T>::setLogMod(long value) {
+  this->logMod = value;
+}
+
+
+template <class T>
+void SpektrumSatellite<T>::logFrame(long available, bool result) {
+    if (result) {
+      successCount++;
+    } else {
+      failCount++;
+    }
+    if (logMod>0) {
+      if (getStatus()==Receiving){
+        if (frameCount%logMod==0){
+          log("getFrame");
+          log("available data:",available);
+          log("-> isConnected:",isConnected()?"true":"false");
+          log("-> isValidSystem:",isValidSystem(this->system)?"true":"false");
+          log("-> frameCount:",frameCount);
+          log("-> successCount:",successCount);
+          log("-> failCount:",failCount);
+        } 
+      } else {
+        if (serialLog!=NULL) {
+          serialLog->print(available>0 ? "+" : ".");
+        }
+      }
+    }
+    frameCount++;
+}
+
 
 template <class T>
 void SpektrumSatellite<T>::setLog(Stream& logSer){

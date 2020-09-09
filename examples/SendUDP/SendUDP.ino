@@ -1,7 +1,7 @@
 
 /**
  * Example Use of the SpektrumSatellite class to read the data from analog lines and 
- * send it via UDP. 
+ * send it via UDP. We create an Access Point that the receiver is connecting to.
  * 
  * With this we can implement a simple custom remote control which reads the joystick 
  * values and sends them via UDP.
@@ -16,22 +16,28 @@
 
 #ifdef ESP32
   #include <WiFi.h>
+  #include <WiFiClient.h>
   #include <WiFiUdp.h>
 #else
     #error "This demo requires an ESP32 or ESP8266 -> Please convert the sketch to your board"
 #endif
 
 
-char* ssid = "Your SSID";                 //Change this to your router SSID.
-char* password =  "Your Password";        //Change this to your router password.
-const char * udpAddress = "10.147.17.0";  //Change this to match your network
+char* ssid = "RemoteControl";                
+char* password =  "password123";   
+
+IPAddress local_IP(192,168,4,1);
+IPAddress gateway(192,168,4,0);
+IPAddress subnet(255,255,255,0);   
+IPAddress target_IP(192,168,4,2);
+
 const int udpPort = 6789;
 unsigned long intervall = 500;  // send every 500ms (=2 messages per second)
 unsigned long intervallTime;
 WiFiUDP udp;
 uint8_t* buffer = new uint8_t[10*MAX_CHANNELS+1];
 
-SpektrumSatellite<uint16_t> satellite(Serial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+SpektrumSatellite<uint16_t> satellite(udp); // Assigning the Sattelite to use UDP
 SpektrumCSV<uint16_t> csv;
 
 const int pins = 6;  // number of channels for servos
@@ -39,21 +45,22 @@ int inPins[] = {16, 5, 4, 0, 10, 9};  // analog input pins
 
 void setup() {
   Serial.begin(115200);
-
-  //Initiate connection
-  WiFi.disconnect(true);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print('.');
-    delay(500);
-  }
-
   Serial.println();
   Serial.println("setup");
 
+  //Initiate connection
+  WiFi.disconnect(true);
+  
+  WiFi.softAPConfig (local_IP,gateway,subnet);
+  WiFi.softAP(ssid, password);
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(myIP);
+  Serial.println("Access Point started");
+
   // Activate the logging to the console only if SpektrumSatellite is not using Serial
   satellite.setLog(Serial);
+  satellite.setLogMod(1); // log every record
   // we can define the requested binding mode
   satellite.setBindingMode(External_DSM2_11ms);
   
@@ -76,7 +83,7 @@ void loop() {
     }
 
     // send binary data
-    udp.beginPacket(udpAddress, udpPort);
+    udp.beginPacket(target_IP, udpPort);
     //udp.write(satellite.getSendBuffer(), SEND_BUFFER_SIZE);
     satellite.sendData();
     udp.endPacket();
