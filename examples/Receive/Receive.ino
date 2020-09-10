@@ -19,7 +19,6 @@ const int pins = 6;  // number of channels for servos
 Servo servos[pins];  // allocate servos for all channels
 int pwmPins[] = {16, 5, 4, 0, 10, 9};  // servo pins 
 int rxPin = 3; // pin for receiving data from serial1
-int failSaveValues[] = {0,90,90,90,90,90}; // neutrol positions
 
 
 void setup() {
@@ -53,14 +52,6 @@ void loop() {
        long value = satellite.getChannelValue(ch);
        servos[j].write(value);
     }        
-  } 
-    // if we loose the connection we set the values to neutral 
-  if (satellite.isConnected()) {
-    satellite.log("Invoking fail save values");   
-    for (int j=0;j<pins; j++){
-      servos[j].write(failSaveValues[j]);
-    }        
-  }
-  
-  
+  }   
+
 }

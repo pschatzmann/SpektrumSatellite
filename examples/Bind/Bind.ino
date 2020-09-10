@@ -1,10 +1,9 @@
 /**
- *  Sets the Satellite Receiver into Binding Mode:
+ *  Sets the Satellite Receiver into Binding Mode with an ESP32:
  *  - Please use a Microcontroller which uses a 3.3V logic.
- *  - We power the Satellite from a digital GPIO Pin (e.g 5)
- *  - Connect the Control line of the receiver to the RX pin of the Microcontroller
- *  - You can (optionally) use Serial1 for logging
- *  - This example has been written for a ESP32
+ *  - We power the Satellite via a digital GPIO Pin (e.g 23)
+ *  - We use Serial2 to connect the Data line of the Satellite. Connect the RX pin of the Microcontroller (GPIO 23)
+ *  - We use Serial for logging
  * 
  *  The receiver is set into bind mode if it receives a defined number of falling signals right
  *  after the power up:  This is the reason why we need to power the receiver via a GPIO pin!
@@ -12,10 +11,13 @@
  */
 
 #include "SpektrumSatellite.h"
+#include "SpektrumCSV.h"
+
 #define ONBOARD_LED  2
 
-SpektrumSatellite<uint16_t> satellite(Serial); 
-int rxPin = 3; 
+SpektrumSatellite<uint16_t> satellite(Serial2); 
+SpektrumCSV<uint16_t> csv;
+int rxPin = 16; 
 int powerPin = 23; 
 
 // blinking the LED
@@ -23,11 +25,19 @@ bool led_state = true;
 int led_interval;
 long led_timeout;
 
+// print buffer for csv
+uint8_t buffer[1024];
+
+
 void setup() {
   // Setup logging
-  Serial1.begin(115200);
-  Serial1.println();
-  Serial1.println("setup");
+  Serial.begin(115200);
+  Serial.println();
+  Serial.println("setup");
+  satellite.setLog(Serial);
+
+  pinMode(ONBOARD_LED,OUTPUT);
+  digitalWrite(ONBOARD_LED, HIGH);
 
   // we set the receiver into binding mode
   satellite.setBindingMode(External_DSM2_11ms);
@@ -45,7 +55,10 @@ void loop() {
   // when we receive data we 
   if (satellite.getFrame()) {  
      led_interval = 0;
-     led_state = true;
+     led_state = false;
+     // write data to log
+     csv.toString(satellite, buffer, 1024);
+     Serial.print((char*)buffer);     
   }
   
   // update led
