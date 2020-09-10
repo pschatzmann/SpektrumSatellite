@@ -705,13 +705,15 @@ void SpektrumSatellite<T>::startBinding(unsigned powerPin, unsigned rxPin) {
     
       pinMode(rxPin, OUTPUT);    // sets the digital pin as output
       digitalWrite(rxPin, LOW);  // make sure that the pin off
-      delay(1000);
+      pinMode(powerPin, OUTPUT);    // sets the digital pin as output
+      digitalWrite(powerPin, LOW);  // make sure that the pin off
+      delay(2000);
 
       // To put a receiver into bind mode, within 200ms of power application the host device 
       // needs to issue a series of falling pulses
       pinMode(powerPin, OUTPUT);    // sets the digital pin as output
-      digitalWrite(rxPin, HIGH); // sets the digital pin on
       digitalWrite(powerPin, HIGH);  // make sure that the pin off
+      delay(50);
       
       log("-> number of pulses: ", bindMode);
       //noInterrupts();
@@ -728,8 +730,6 @@ void SpektrumSatellite<T>::startBinding(unsigned powerPin, unsigned rxPin) {
 
       delay(500);      
       pinMode(rxPin, INPUT);    // sets the digital pin 13 as input
-      // we need to re-activate the serial interface again
-      delay(500);
     }
 }
 
