@@ -13,7 +13,7 @@ template <class T> class SpektrumSatellite;
 template <class T> 
 class SpektrumCSV {
     public:
-        SpektrumCSV(char delimiter=',', bool isTranslated=true);
+        SpektrumCSV(char delimiter=',',int decimals=2, bool isTranslated=true);
         void toString(SpektrumSatellite<T> &satellite, uint8_t dataSting[], uint16_t maxLen);
         bool parse(uint8_t* str, SpektrumSatellite<T> &satellite);
         void setFactor(double factor);
@@ -21,12 +21,20 @@ class SpektrumCSV {
       char delimiter;
       bool isTranslated;
       char* findEnd(char* start);
+      char format[15];
 };
 
 template <class T>
-SpektrumCSV<T>::SpektrumCSV(char delimiter, bool isTranslated){
+SpektrumCSV<T>::SpektrumCSV(char delimiter,int decimals, bool isTranslated){
     this->delimiter = delimiter;
     this->isTranslated = isTranslated;
+    // determine format string e.g. "%.2f"
+    strcpy(format,"%.");
+    char decimalsTxt[10];
+    itoa(decimals, decimalsTxt, 10);
+    strcat(format, decimalsTxt);
+    strcat(format,"f");
+
 }
 
 
@@ -38,7 +46,7 @@ void SpektrumCSV<T>::toString(SpektrumSatellite<T> &satellite, uint8_t str[], ui
     uint8_t* start = str;
     for (int j=0; j < MAX_CHANNELS; j++){
         float val = isTranslated ?  satellite.getChannelValue((Channel)j): satellite.getChannelValuesRaw()[(Channel)j];
-        int len = sprintf((char*)start, "%.2f", val);
+        int len = sprintf((char*)start, format, val);
         start+=len;
         if (j<MAX_CHANNELS-1){
             *start = delimiter;

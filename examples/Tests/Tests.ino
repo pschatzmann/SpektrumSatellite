@@ -124,7 +124,7 @@ void testBinary() {
   Serial.println("***********************");
   Serial.println("testBinary ");
   SpektrumSatellite<uint16_t> satellite(Serial); 
-  satellite.setChannelValueRange(0, 11);
+ // satellite.setChannelValueRange(0, 11);
 
   for (int j=0;j<MAX_CHANNELS;j++){
       satellite.setChannelValue((Channel)j,j);
@@ -133,7 +133,7 @@ void testBinary() {
   // get and parse spektrum data
   byte* buffer = satellite.getSendBuffer(false);
   satellite.parseFrame(buffer);
-
+  
   buffer = satellite.getSendBuffer(true);
   satellite.parseFrame(buffer);
 
@@ -178,7 +178,7 @@ void testHeader() {
   Serial.print("system ->");
   Serial.println(satellite.getSystem()==DSMS_22MS_2048?"OK":"Error");
   Serial.print("isValidSystem ->");
-  Serial.println(satellite.isValidSystem()?"OK":"Error");
+  Serial.println(satellite.isValidSystem(satellite.getSystem())?"OK":"Error");
   Serial.print("system ->");
   Serial.println(satellite.getFades()==0?"OK":"Error");
 

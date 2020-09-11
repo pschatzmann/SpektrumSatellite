@@ -19,7 +19,7 @@
 #define MASK_1024_SXPOS 0x03FF
 #define MASK_2048_CHANID 0x7800
 #define MASK_2048_SXPOS 0x07FF 
-#define SEND_BUFFER_SIZE 16
+#define SEND_BUFFER_SIZE sizeof(Data)
 #define BINDING_PULSE_DELAY_MS 100
 #define SPEKTRUM_SATELLITE_BPS 125000
 
@@ -74,6 +74,11 @@ union Header {
     byte fades;
     byte system;
   } internal;
+};
+
+struct __attribute__((__packed__)) Data {
+  Header header;
+  uint16_t values[7];
 };
 
 
@@ -132,12 +137,6 @@ class SpektrumSatellite {
     bool isConnected();
     bool isConnected(long timeoutMs);
     
-    // // Test if we are receiving any valid data within the indicated time
-    // bool isReceivingData(unsigned long timeOut);
-    
-    // // Test if we are receiving any valid data within the default time
-    // bool isReceivingData();
-
     // wait for any data
     void waitForData();
     
@@ -157,6 +156,7 @@ class SpektrumSatellite {
     System getSystem();
     boolean isValidSystem(int system);
     boolean isInternal();
+    void switchEndianness();
 
     // checks if the biggest number is 2048 (instead of 1024)
     bool is2048();
@@ -184,7 +184,7 @@ class SpektrumSatellite {
 
   private:
     uint16_t channelValues[12];
-    uint16_t sendValues[7];
+    Data dataPacket; //;uint16_t sendValues[7];
     unsigned long timeOfLastRead;
     unsigned long successCount;
     unsigned long failCount;
@@ -196,6 +196,7 @@ class SpektrumSatellite {
     System system;
     boolean isInternalFlag;
     boolean isSendAuxData;
+    boolean isSwapBytes = true;
     
     Stream *serial;
     Stream *serialLog = NULL;
@@ -206,6 +207,7 @@ class SpektrumSatellite {
     
     // private methods
     void logFrame(long available, bool result);
+    void swapBytes(uint16_t* value);
 };
 
 // 12 channels
@@ -245,19 +247,15 @@ void SpektrumSatellite<T>::setBindingMode(BindMode bindMode) {
   log("setBindingMode");
   this->bindMode = bindMode;
   if (bindMode == Internal_DSM2_22ms || bindMode == External_DSM2_22ms){
-    maskCHANID = MASK_1024_CHANID;
-    maskVALUE = MASK_1024_SXPOS;
-    system = DSM2_22MS_1024;
+    setSystem(DSM2_22MS_1024);
   } else {
-    maskCHANID = MASK_2048_CHANID;
-    maskVALUE = MASK_2048_SXPOS;
 
     if ( Internal_DSM2_11ms || bindMode == External_DSM2_11ms){
-      system = DSM2_11MS_2048;
+      setSystem(DSM2_11MS_2048);
     } else if (bindMode == Internal_DSMx_11ms || bindMode == External_DSMx_11ms) {
-      system = DSMX_11MS_2048;
+      setSystem(DSMX_11MS_2048);
     } else if (bindMode == Internal_DSMx_22ms || bindMode == External_DSMx_22ms) {
-      system = DSMS_22MS_2048;
+      setSystem(DSMS_22MS_2048);
     }    
   }
 
@@ -282,6 +280,15 @@ void SpektrumSatellite<T>::setSystem(System system){
   if (this->system!=system)
     logHex("setSystem:", system);
   this->system = system;
+
+  if (system == DSM2_22MS_1024){
+    maskCHANID = MASK_1024_CHANID;
+    maskVALUE = MASK_1024_SXPOS;
+  } else {
+    maskCHANID = MASK_2048_CHANID;
+    maskVALUE = MASK_2048_SXPOS;
+  }
+
 }
 
 template <class T>
@@ -311,6 +318,8 @@ boolean SpektrumSatellite<T>::isValidSystem(int system) {
   return result;  
 }
 
+
+
 template <class T>
 bool SpektrumSatellite<T>::parseFrame(byte* inData){
   uint16_t* inData16 =  (uint16_t*) inData;
@@ -319,18 +328,23 @@ bool SpektrumSatellite<T>::parseFrame(byte* inData){
     Header* header = (Header*) inData;
     if (isInternal()){
         this->fades = header->internal.fades;
-        if (isValidSystem(header->internal.system))
-          this->system = (System) (header->internal.system);
+        if (header->internal.system != getSystem()){
+          if (isValidSystem(header->internal.system))
+            setSystem((System) header->internal.system);
+          else
+            logHex("Unexpected system", header->internal.system);
+        }
     } else {
         this->fades = header->fades;
     }
 
-    uint16_t channelShift = is2048() ? 11 : 10;  
     // determine channel values
+    uint16_t channelShift = is2048() ? 11 : 10;  
     for (int i = 1; i <= 7; i++) {
-      short inValue = inData16[i];
-      short channelID = (inValue & maskCHANID)>>channelShift;
-      short channelValue = inValue & maskVALUE;
+      uint16_t inValue = inData16[i];
+      swapBytes(&inValue);
+      uint16_t channelID = (inValue & maskCHANID)>>channelShift;
+      uint16_t channelValue = inValue & maskVALUE;    
       if (channelID>=0 && channelID<MAX_CHANNELS) {
         channelValues[channelID] = channelValue; 
       } else {
@@ -340,6 +354,17 @@ bool SpektrumSatellite<T>::parseFrame(byte* inData){
     return true;
 }
 
+template <class T>
+void SpektrumSatellite<T>::swapBytes(uint16_t* value){
+  if (isSwapBytes) {
+    *value= ((*value<<8)&0xff00)|((*value>>8)&0x00ff);  
+  }
+}
+
+template <class T>
+void SpektrumSatellite<T>::switchEndianness() {
+   this->isSwapBytes = !this->isSwapBytes;
+}
 
 template <class T>
 bool SpektrumSatellite<T>::getFrame(){
@@ -432,6 +457,8 @@ void SpektrumSatellite<T>::setChannelValue(Channel channelId, T value) {
     channelValues[channelId] = scaler.deScale(value);
     if (channelId>=Aux1){
       isSendAuxData = true;
+    } else {
+      log("Invalid Channel Number:", channelId);
     }
   }
 }
@@ -514,23 +541,25 @@ byte *SpektrumSatellite<T>::getSendBuffer() {
 
 template <class T>
 byte *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
-    memset(sendValues,0,sizeof(sendValues));
+    memset(&dataPacket,0,sizeof(Data));
 
     // determine the position of the index info
     uint16_t channelShift = is2048() ? 11 : 10;  
     // update the data in the sendValues buffer
     if (auxData){
-      for(int j=5;j<MAX_CHANNELS;j++){
-        sendValues[j-5+1] = channelValues[j] & maskVALUE | j<<channelShift;
+      for(int j=6;j<MAX_CHANNELS;j++){
+        dataPacket.values[j-6+1] = channelValues[j] & maskVALUE | j<<channelShift;
+        swapBytes(&dataPacket.values[j-6+1]);
       }
     } else {
       for(int j=0;j<7;j++){
-        sendValues[j+1] = channelValues[j] & maskVALUE | j<<channelShift;
+        dataPacket.values[j+1] = channelValues[j] & maskVALUE | j<<channelShift;
+        swapBytes(&dataPacket.values[j+1]);
       }
     }
 
     // if the mode is internal we need to add the system id
-    Header* header = (Header*)sendValues;
+    Header* header = &(dataPacket.header);
     if (isInternal()) {
       header->internal.fades = this->fades;
       header->internal.system = this->system;
@@ -538,7 +567,7 @@ byte *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
       header->fades = this->fades;
     }
 
-    return (byte*)sendValues;
+    return (byte*)&dataPacket;
 }
 
 
@@ -599,7 +628,7 @@ void SpektrumSatellite<T>::setChannelValueRange(T min, T max){
 
 template <class T>
 bool SpektrumSatellite<T>::is2048() {
-  return this->system==0x01?false:true;
+  return this->system==DSM2_22MS_1024?false:true;
 }
 
 template <class T>

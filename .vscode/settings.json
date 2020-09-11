@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "sstream": "cpp",
+        "array": "cpp",
+        "string_view": "cpp",
+        "iterator": "cpp",
+        "string": "cpp",
+        "vector": "cpp",
+        "ranges": "cpp"
+    }
+}
