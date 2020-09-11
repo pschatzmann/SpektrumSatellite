@@ -47,7 +47,7 @@ void setup() {
   led_interval = 1000;
 
   // switch rxPin to receive data on Serial 
-  Serial.begin(SPEKTRUM_SATELLITE_BPS);
+  Serial2.begin(SPEKTRUM_SATELLITE_BPS);
 
 }
 
