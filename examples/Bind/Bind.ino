@@ -10,13 +10,25 @@
  * 
  */
 
+/**
+ *  Sets the Satellite Receiver into Binding Mode with an ESP32:
+ *  - Please use a Microcontroller which uses a 3.3V logic.
+ *  - We power the Satellite via a digital GPIO Pin (e.g 23)
+ *  - We use Serial2 to connect the Data line of the Satellite. Connect the RX pin of the Microcontroller (GPIO 23)
+ *  - We use Serial for logging
+ * 
+ *  The receiver is set into bind mode if it receives a defined number of falling signals right
+ *  after the power up:  This is the reason why we need to power the receiver via a GPIO pin!
+ * 
+ */
+
 #include "SpektrumSatellite.h"
 #include "SpektrumCSV.h"
 
 #define ONBOARD_LED  2
 
 SpektrumSatellite<uint16_t> satellite(Serial2); 
-SpektrumCSV<uint16_t> csv;
+SpektrumCSV<uint16_t> csv(',', 0);
 int rxPin = 16; 
 int powerPin = 23; 
 
@@ -57,6 +69,7 @@ void loop() {
      led_interval = 0;
      led_state = false;
      // write data to log
+
      csv.toString(satellite, buffer, 1024);
      Serial.print((char*)buffer);     
   }

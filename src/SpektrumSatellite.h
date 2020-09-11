@@ -7,6 +7,7 @@
  * - Support for binding using different BindModes
  * - Automatic handling of 1024 or 2048 servo data
  * - Support for sending data
+ * - Checks the endianness (in Arudino the processor is little endian, the protocal sends all data fields as big-endian)
  */
 
 #ifndef SPECTRUMSATELLITE_H_
@@ -168,8 +169,8 @@ class SpektrumSatellite {
     
     // == usually not needed but in case when you need to access the data
     bool parseFrame(byte* inData);
-    byte* getSendBuffer(boolean auxData);
-    byte* getSendBuffer();
+    Data* getSendBuffer(boolean auxData);
+    Data* getSendBuffer();
     // logging
     void setLog(Stream& log);
     void setLogMod(long value);
@@ -196,7 +197,7 @@ class SpektrumSatellite {
     System system;
     boolean isInternalFlag;
     boolean isSendAuxData;
-    boolean isSwapBytes = true;
+    boolean isSwapBytes;
     
     Stream *serial;
     Stream *serialLog = NULL;
@@ -235,6 +236,14 @@ SpektrumSatellite<T>::SpektrumSatellite(Stream& serial) {
 
     // setup Initial Status
     this->status = NotConnected;
+
+    // check endianness
+    int n = 1;
+    if(*(char *)&n == 1) {
+      // little endian if true
+       this->isSwapBytes = true;
+    }
+
 }
 
 template <class T>
@@ -535,12 +544,12 @@ void SpektrumSatellite<T>::setAux7(T value){
 }
 
 template <class T>
-byte *SpektrumSatellite<T>::getSendBuffer() {
+Data *SpektrumSatellite<T>::getSendBuffer() {
   return getSendBuffer(false);
 }
 
 template <class T>
-byte *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
+Data *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
     memset(&dataPacket,0,sizeof(Data));
 
     // determine the position of the index info
@@ -567,7 +576,7 @@ byte *SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
       header->fades = this->fades;
     }
 
-    return (byte*)&dataPacket;
+    return &dataPacket;
 }
 
 
@@ -576,13 +585,13 @@ void SpektrumSatellite<T>::sendData(){
   if (sendCount>0 && sendCount++%logMod==0){
     log("sendData");
   }
-  uint16_t* data = (uint16_t*) getSendBuffer();
-  serial->write((uint8_t*)data,SEND_BUFFER_SIZE);
+  Data* data =  getSendBuffer();
+  serial->write((byte*)data,SEND_BUFFER_SIZE);
 
   // send Aux if necessary
   if (isSendAuxData){ 
-    uint16_t* data = (uint16_t*) getSendBuffer(true);
-    serial->write((uint8_t*)data,SEND_BUFFER_SIZE);
+    Data* data =  getSendBuffer(true);
+    serial->write((byte*)data,SEND_BUFFER_SIZE);
   }
 }
 
