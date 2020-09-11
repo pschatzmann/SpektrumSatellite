@@ -255,19 +255,19 @@ template <class T>
 void SpektrumSatellite<T>::setBindingMode(BindMode bindMode) {
   log("setBindingMode");
   this->bindMode = bindMode;
+
+  // update the system information
   if (bindMode == Internal_DSM2_22ms || bindMode == External_DSM2_22ms){
     setSystem(DSM2_22MS_1024);
-  } else {
-
-    if ( Internal_DSM2_11ms || bindMode == External_DSM2_11ms){
-      setSystem(DSM2_11MS_2048);
-    } else if (bindMode == Internal_DSMx_11ms || bindMode == External_DSMx_11ms) {
-      setSystem(DSMX_11MS_2048);
-    } else if (bindMode == Internal_DSMx_22ms || bindMode == External_DSMx_22ms) {
-      setSystem(DSMS_22MS_2048);
-    }    
-  }
-
+  } else if (bindMode == Internal_DSM2_11ms || bindMode == External_DSM2_11ms){
+    setSystem(DSM2_11MS_2048);
+  } else if (bindMode == Internal_DSMx_11ms || bindMode == External_DSMx_11ms) {
+    setSystem(DSMX_11MS_2048);
+  } else if (bindMode == Internal_DSMx_22ms || bindMode == External_DSMx_22ms) {
+    setSystem(DSMS_22MS_2048);
+  }    
+  
+  // update the internal flag
   if (bindMode == Internal_DSM2_11ms || bindMode == Internal_DSM2_22ms || bindMode == Internal_DSMx_11ms || bindMode == Internal_DSMx_22ms ){
     isInternalFlag = true;
   } else {
@@ -286,8 +286,7 @@ System SpektrumSatellite<T>::getSystem(){
 
 template <class T>
 void SpektrumSatellite<T>::setSystem(System system){
-  if (this->system!=system)
-    logHex("setSystem:", system);
+  logHex("setSystem:", system);
   this->system = system;
 
   if (system == DSM2_22MS_1024){
@@ -327,37 +326,47 @@ boolean SpektrumSatellite<T>::isValidSystem(int system) {
   return result;  
 }
 
-
-
 template <class T>
 bool SpektrumSatellite<T>::parseFrame(byte* inData){
-  uint16_t* inData16 =  (uint16_t*) inData;
+    Data* data =  (Data*) inData;
+    static bool systemReported = false;
     // a frame is 16 bytes -> 7 channels + fades
     // determine system and fades
-    Header* header = (Header*) inData;
     if (isInternal()){
-        this->fades = header->internal.fades;
-        if (header->internal.system != getSystem()){
-          if (isValidSystem(header->internal.system))
-            setSystem((System) header->internal.system);
-          else
-            logHex("Unexpected system", header->internal.system);
+        this->fades = data->header.internal.fades;
+        if (!systemReported){
+          System recevedSystem = (System) data->header.internal.system;
+          logHex("System from the Satellite:", recevedSystem);
+          systemReported = true;
+          if (recevedSystem != getSystem()){
+            if (isValidSystem(recevedSystem))
+              setSystem(recevedSystem);
+            else
+              logHex("Unexpected system", recevedSystem);
+          }
         }
     } else {
-        this->fades = header->fades;
+        this->fades = data->header.fades;
     }
 
     // determine channel values
     uint16_t channelShift = is2048() ? 11 : 10;  
-    for (int i = 1; i <= 7; i++) {
-      uint16_t inValue = inData16[i];
+    for (int i = 0; i < 7; i++) {
+      uint16_t inValue = data->values[i];
       swapBytes(&inValue);
       uint16_t channelID = (inValue & maskCHANID)>>channelShift;
-      uint16_t channelValue = inValue & maskVALUE;    
+      uint16_t channelValue = inValue & maskVALUE;   
+
+      //Serial.print(inValue);
+      //Serial.print(" / ");
+      //Serial.print(channelID);
+      //Serial.print("=>");
+      //Serial.println(channelValue);
+
       if (channelID>=0 && channelID<MAX_CHANNELS) {
         channelValues[channelID] = channelValue; 
       } else {
-        log("Invalid Channel in parseFrame: ",channelID);
+        //log("Invalid Channel in parseFrame: ",channelID);
       }
     }
     return true;
@@ -745,6 +754,7 @@ void SpektrumSatellite<T>::startBinding(unsigned powerPin, unsigned rxPin) {
       digitalWrite(rxPin, LOW);  // make sure that the pin off
       pinMode(powerPin, OUTPUT);    // sets the digital pin as output
       digitalWrite(powerPin, LOW);  // make sure that the pin off
+      digitalWrite(rxPin, HIGH); // set initial state to high
       delay(2000);
 
       // To put a receiver into bind mode, within 200ms of power application the host device 
