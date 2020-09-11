@@ -9,6 +9,7 @@
  */
 
 #include "SpektrumSatellite.h"
+#include "SpektrumCSV.h"
 
 #ifdef ESP32
   #include <WiFi.h>
@@ -31,7 +32,7 @@ unsigned long intervall = 1000;            // send every 500ms (=2 messages per 
 unsigned long intervallTime;
 uint8_t* buffer = new uint8_t[10*MAX_CHANNELS+1];
 
-SpektrumSatellite<float> satellite(Serial2; // we use doubles!
+SpektrumSatellite<float> satellite(Serial2); // we use doubles!
 SpektrumCSV<float> csv(',',true);
 WiFiUDP udp;
 
@@ -46,8 +47,7 @@ void setup() {
 
   //Initiate WIFI connection
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
+  while (WiFi.status() != WL_CONNECTED) {
     Serial.print('.');
     delay(500);
   }

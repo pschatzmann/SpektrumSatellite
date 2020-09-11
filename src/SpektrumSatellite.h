@@ -169,6 +169,7 @@ class SpektrumSatellite {
     
     // == usually not needed but in case when you need to access the data
     bool parseFrame(byte* inData);
+    bool parseFrame(Data* inData);
     Data* getSendBuffer(boolean auxData);
     Data* getSendBuffer();
     // logging
@@ -328,6 +329,11 @@ boolean SpektrumSatellite<T>::isValidSystem(int system) {
 
 template <class T>
 bool SpektrumSatellite<T>::parseFrame(byte* inData){
+  return parseFrame((Data*) inData);
+}
+
+template <class T>
+bool SpektrumSatellite<T>::parseFrame(Data* inData){
     Data* data =  (Data*) inData;
     static bool systemReported = false;
     // a frame is 16 bytes -> 7 channels + fades

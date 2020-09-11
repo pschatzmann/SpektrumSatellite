@@ -1,4 +1,3 @@
-/**
  * Example Use of the SpektrumSatellite to receive the data on the RX line and send it
  * as binary data via UDP.
  * 
@@ -7,6 +6,7 @@
  */
 
 #include "SpektrumSatellite.h"
+#include "SpektrumCSV.h"
 
 #ifdef ESP32
   #include <WiFi.h>
@@ -35,17 +35,16 @@ WiFiUDP udp;
 
 
 void setup() {
-  Serial2.begin(SPEKTRUM_SATELLITE_BPS);
   Serial.begin(115200);
   Serial.println();
   Serial.println("setup");
-  // Activate the logging to the console only if SpektrumSatellite is not using Serial
+
+  Serial2.begin(SPEKTRUM_SATELLITE_BPS);
   satellite.setLog(Serial);
 
   //Initiate WIFI connection
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
+  while (WiFi.status() != WL_CONNECTED) {
     Serial.print('.');
     delay(500);
   }

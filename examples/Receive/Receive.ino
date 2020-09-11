@@ -12,7 +12,12 @@
  */
 
 #include "SpektrumSatellite.h"
+
+#ifdef ESP32
+#include <ESP32_Servo.h>
+#else
 #include "Servo.h"
+#endif
 
 SpektrumSatellite<uint16_t> satellite(Serial2); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
 const int pins = 6;  // number of channels for servos
