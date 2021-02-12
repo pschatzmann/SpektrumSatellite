@@ -100,7 +100,7 @@ class SpektrumSatellite {
     void startBinding(unsigned powerPin, unsigned rxPin);
     
     // Receive a data record from the Satellite Receiver
-    bool getFrame();
+    bool getFrame(int timeout=DEFAULT_RECEIVING_TIMEOUT);
 
     // Gets the scaled value for the indicated channel
     T getChannelValue(Channel channelId);
@@ -155,8 +155,14 @@ class SpektrumSatellite {
     
     // Determines the system
     System getSystem();
+
+    // checks if the system is valid
     boolean isValidSystem(int system);
+ 
+    // checks if binding is in internal mode
     boolean isInternal();
+
+    // switch endianness if necessary for processors which are little endian
     void switchEndianness();
 
     // checks if the biggest number is 2048 (instead of 1024)
@@ -166,6 +172,9 @@ class SpektrumSatellite {
     uint16_t getFades();
 
     Status getStatus();
+
+    // Defines that we need to process all data (use on reliable connectins only)
+    void setProcessAllData(bool flag);
     
     // == usually not needed but in case when you need to access the data
     bool parseFrame(byte* inData);
@@ -199,6 +208,7 @@ class SpektrumSatellite {
     boolean isInternalFlag;
     boolean isSendAuxData;
     boolean isSwapBytes;
+    boolean processAllData = false;
     
     Stream *serial;
     Stream *serialLog = NULL;
@@ -328,6 +338,11 @@ boolean SpektrumSatellite<T>::isValidSystem(int system) {
 }
 
 template <class T>
+void SpektrumSatellite<T>::setProcessAllData(bool flag){
+  processAllData = flag;
+}
+
+template <class T>
 bool SpektrumSatellite<T>::parseFrame(byte* inData){
   return parseFrame((Data*) inData);
 }
@@ -391,7 +406,7 @@ void SpektrumSatellite<T>::switchEndianness() {
 }
 
 template <class T>
-bool SpektrumSatellite<T>::getFrame(){
+bool SpektrumSatellite<T>::getFrame(int transactionTimeMs){
     short inByte;
     byte inData[SEND_BUFFER_SIZE];
     bool result = false;
@@ -400,16 +415,36 @@ bool SpektrumSatellite<T>::getFrame(){
     //  16-byte data packet every 11ms or 22ms, 
     if (available >= 16) {
       timeOfLastRead = millis();
-      inByte = serial->readBytes(inData,SEND_BUFFER_SIZE);
-      parseFrame(inData);
-      // check if the frame is valid
-      result = isValidSystem(this->system);
-      status = Receiving;
+      // resychronize and use last data
+      if (!processAllData && available > 16){
+        long diff = available - 16;
+        log("skipping number of bytes:", diff);
+        // skip unnecessary data
+        for (int j=0;j<diff;j++)
+          serial->read();
+      }
+      
+      // read the latest data packet
+      inByte = serial->readBytes(inData, 16);
+      if (inByte!=16){
+        log("We could not read all data");
+        result = false;
+      } else {
+        // check if we processed the data within the indicated time period
+        result = isConnected(transactionTimeMs);
+        if (result){
+          parseFrame(inData);
+          // check if the frame is valid
+          result = isValidSystem(this->system);
+          status = Receiving;
 
-      // log the status
-      logFrame(available, result);    
+          // log the status
+          logFrame(available, result);    
+        } else {
+          log("Frame ignored because of timeout");
+        }
+      }
     }
-
     
     return result;
 }
