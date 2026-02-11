@@ -2,13 +2,9 @@
  *  Serialization of the SpektrumSatellite data to and from a CSV line
  */
 
-#ifndef SPEKTRUMCSV_H_
-#define SPEKTRUMCSV_H_
+#pragma once
 
 #include "SpektrumSatellite.h"
-
-// forward declaration of SpektrumSatellite
-template <class T> class SpektrumSatellite; 
 
 template <class T> 
 class SpektrumCSV {
@@ -34,9 +30,7 @@ SpektrumCSV<T>::SpektrumCSV(char delimiter,int decimals, bool isTranslated){
     itoa(decimals, decimalsTxt, 10);
     strcat(format, decimalsTxt);
     strcat(format,"f");
-
 }
-
 
 /**
  * Convert to tab seperated values
@@ -93,6 +87,3 @@ char* SpektrumCSV<T>::findEnd(char* startU) {
     return end;
 }
 
-
-
-#endif /* SERIALIZATION_H_ */
