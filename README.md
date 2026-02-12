@@ -1,5 +1,9 @@
 # Spectrum Satellite API for Arduino
 
+[![Arduino Library](https://img.shields.io/badge/Arduino-Library-blue.svg)](https://www.arduino.cc/reference/en/libraries/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
+
  This project implements an Arduino API for the Spectrum Satellite Receiver. It should work with any type of board (e.g. Arduinos, ESP32, ESP8266 etc)
 
  - Complete Implementation of the Specification (See https://www.spektrumrc.com/ProdInfo/Files/Remote%20Receiver%20Interfacing%20Rev%20A.pdf)
