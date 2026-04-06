@@ -87,7 +87,7 @@ struct __attribute__((__packed__)) Data {
  * @brief Spktrum Sattellite Protocol API
  * @author Phil Schatzmann
  */
-template <class T>
+template <class T = uint16_t>
 class SpektrumSatellite {
  public:
   // Constructor
