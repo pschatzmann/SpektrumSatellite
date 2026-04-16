@@ -168,6 +168,10 @@ void loop() {
 }
 
 ```
+## Documentation
+
+- [Class Overview](https://pschatzmann.github.io/SpektrumSatellite/docs/html/annotated.html)
+- [SpektrumSatellite](https://pschatzmann.github.io/SpektrumSatellite/docs/html/classSpektrumSatellite.html)
 
 ## Installation
 You can download this project as ZIP and in the Arduino IDE use -> Sketch -> Include Library -> Add ZIP Library. 
