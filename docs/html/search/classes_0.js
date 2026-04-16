@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['header_0',['Header',['../unionHeader.html',1,'']]]
+  ['header_0',['Header',['../unionspektrum__satellite_1_1Header.html',1,'spektrum_satellite']]]
 ];

@@ -4,6 +4,8 @@
 
 #include "SpektrumSatellite.h"
 
+namespace spektrum_satellite {
+
 /**
  * @class Scaler
  * @brief Scale from and to defined range. 
@@ -73,3 +75,5 @@ class Scaler {
     return finalize(r);
   }
 };
+
+}  // namespace spektrum_satellite

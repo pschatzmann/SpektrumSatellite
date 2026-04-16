@@ -2,6 +2,8 @@
 
 #include "SpektrumSatellite.h"
 
+namespace spektrum_satellite {
+
 /**
  * @brief CSV serialization helper for `SpektrumSatellite` channel data.
  *
@@ -117,3 +119,5 @@ class SpektrumCSV {
     return end;
   }
 };
+
+}  // namespace spektrum_satellite

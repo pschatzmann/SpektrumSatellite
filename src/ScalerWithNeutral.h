@@ -2,6 +2,8 @@
 
 #include "SpektrumSatellite.h"
 
+namespace spektrum_satellite {
+
 /**
  * @brief Sometimes the neutral input position is not exactly the the middle of min and
  * max. We allow the definition of a non central netral position:
@@ -39,3 +41,5 @@ class ScalerWithNeutral {
   T neutral;
   T neutralTo;
 };
+
+}  // namespace spektrum_satellite

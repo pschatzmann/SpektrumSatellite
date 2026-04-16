@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['waitfordata_0',['waitForData',['../classSpektrumSatellite.html#a3f51f4725e8f8d388690d7220e880e26',1,'SpektrumSatellite']]]
+  ['tostring_0',['toString',['../classspektrum__satellite_1_1SpektrumCSV.html#a688ad7cb783ef3b123a38e4d07cfb927',1,'spektrum_satellite::SpektrumCSV']]]
 ];

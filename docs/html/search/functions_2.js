@@ -1,6 +1,7 @@
 var searchData=
 [
-  ['log_0',['log',['../classSpektrumSatellite.html#ae994eec6035e644b8f33b7951c856a02',1,'SpektrumSatellite::log(const char *str)'],['../classSpektrumSatellite.html#ac92a072bdd91010772e8278d5fd9fc24',1,'SpektrumSatellite::log(const char *str, const char *str1)'],['../classSpektrumSatellite.html#a331a14a8b1dd30691dc67ef309c532f7',1,'SpektrumSatellite::log(const char *str, int value)']]],
-  ['log1_1',['log1',['../classSpektrumSatellite.html#a8079edd47d495bd2fb3520cd1a491d21',1,'SpektrumSatellite']]],
-  ['loghex_2',['logHex',['../classSpektrumSatellite.html#ae19731525bb8e44d141880c5b21df095',1,'SpektrumSatellite']]]
+  ['is2048_0',['is2048',['../classspektrum__satellite_1_1SpektrumSatellite.html#aa91e20c1af00c51add0295d7bf9010c2',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['isconnected_1',['isconnected',['../classspektrum__satellite_1_1SpektrumSatellite.html#a817bc9a47c04428df325d2d477c77209',1,'spektrum_satellite::SpektrumSatellite::isConnected()'],['../classspektrum__satellite_1_1SpektrumSatellite.html#a61ab18e97dc6d2b972313c478eb68308',1,'spektrum_satellite::SpektrumSatellite::isConnected(long timeoutMs)']]],
+  ['isinternal_2',['isInternal',['../classspektrum__satellite_1_1SpektrumSatellite.html#a40c3d6e75311f8b9e19f94ed15ff2a41',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['isvalidsystem_3',['isValidSystem',['../classspektrum__satellite_1_1SpektrumSatellite.html#a997e07de491e4707491602f8ea8ab646',1,'spektrum_satellite::SpektrumSatellite']]]
 ];

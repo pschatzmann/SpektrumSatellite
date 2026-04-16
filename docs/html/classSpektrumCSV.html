@@ -76,7 +76,7 @@ $(function() {
 </div><!--header-->
 <div class="contents">
 
-<p>CSV serialization helper for <code><a class="el" href="classSpektrumSatellite.html" title="Spektrum Satellite protocol API.">SpektrumSatellite</a></code> channel data.  
+<p>CSV serialization helper for <code>SpektrumSatellite</code> channel data.  
  <a href="classSpektrumCSV.html#details">More...</a></p>
 
 <p><code>#include &lt;<a class="el" href="SpektrumCSV_8h_source.html">SpektrumCSV.h</a>&gt;</code></p>
@@ -86,10 +86,10 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:aa889d3ad4b512c7f514b245187709992" id="r_aa889d3ad4b512c7f514b245187709992"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classSpektrumCSV.html#aa889d3ad4b512c7f514b245187709992">SpektrumCSV</a> (char delimiter=',', int decimals=2, bool isTranslated=true)</td></tr>
 <tr class="memdesc:aa889d3ad4b512c7f514b245187709992"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct a CSV serializer/parser.  <br /></td></tr>
 <tr class="separator:aa889d3ad4b512c7f514b245187709992"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3411f4d604cc6ffae7f53089ff410bba" id="r_a3411f4d604cc6ffae7f53089ff410bba"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classSpektrumCSV.html#a3411f4d604cc6ffae7f53089ff410bba">toString</a> (<a class="el" href="classSpektrumSatellite.html">SpektrumSatellite</a>&lt; T &gt; &amp;satellite, uint8_t str[], uint16_t len)</td></tr>
+<tr class="memitem:a3411f4d604cc6ffae7f53089ff410bba" id="r_a3411f4d604cc6ffae7f53089ff410bba"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classSpektrumCSV.html#a3411f4d604cc6ffae7f53089ff410bba">toString</a> (SpektrumSatellite&lt; T &gt; &amp;satellite, uint8_t str[], uint16_t len)</td></tr>
 <tr class="memdesc:a3411f4d604cc6ffae7f53089ff410bba"><td class="mdescLeft">&#160;</td><td class="mdescRight">Serialize all channels to CSV.  <br /></td></tr>
 <tr class="separator:a3411f4d604cc6ffae7f53089ff410bba"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a12ce2b4904a2738024cfda7554629eba" id="r_a12ce2b4904a2738024cfda7554629eba"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classSpektrumCSV.html#a12ce2b4904a2738024cfda7554629eba">parse</a> (uint8_t *str, <a class="el" href="classSpektrumSatellite.html">SpektrumSatellite</a>&lt; T &gt; &amp;satellite)</td></tr>
+<tr class="memitem:a12ce2b4904a2738024cfda7554629eba" id="r_a12ce2b4904a2738024cfda7554629eba"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classSpektrumCSV.html#a12ce2b4904a2738024cfda7554629eba">parse</a> (uint8_t *str, SpektrumSatellite&lt; T &gt; &amp;satellite)</td></tr>
 <tr class="memdesc:a12ce2b4904a2738024cfda7554629eba"><td class="mdescLeft">&#160;</td><td class="mdescRight">Parse CSV channel values and write them into <code>satellite</code>.  <br /></td></tr>
 <tr class="separator:a12ce2b4904a2738024cfda7554629eba"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab2098e938a8567b2ba6cd947707c119a" id="r_ab2098e938a8567b2ba6cd947707c119a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classSpektrumCSV.html#ab2098e938a8567b2ba6cd947707c119a">setFactor</a> (double factor)</td></tr>
@@ -98,11 +98,11 @@ Public Member Functions</h2></td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><div class="compoundTemplParams">template&lt;class T&gt;<br />
-class SpektrumCSV&lt; T &gt;</div><p>CSV serialization helper for <code><a class="el" href="classSpektrumSatellite.html" title="Spektrum Satellite protocol API.">SpektrumSatellite</a></code> channel data. </p>
-<p>This utility converts channel values to a single CSV line and can parse a CSV line back into a <code><a class="el" href="classSpektrumSatellite.html" title="Spektrum Satellite protocol API.">SpektrumSatellite</a></code> instance.</p>
+class SpektrumCSV&lt; T &gt;</div><p>CSV serialization helper for <code>SpektrumSatellite</code> channel data. </p>
+<p>This utility converts channel values to a single CSV line and can parse a CSV line back into a <code>SpektrumSatellite</code> instance.</p>
 <dl class="tparams"><dt>Template Parameters</dt><dd>
   <table class="tparams">
-    <tr><td class="paramname">T</td><td>Channel value type used by <code><a class="el" href="classSpektrumSatellite.html" title="Spektrum Satellite protocol API.">SpektrumSatellite</a></code> (e.g. <code>uint16_t</code>, <code>float</code>). </td></tr>
+    <tr><td class="paramname">T</td><td>Channel value type used by <code>SpektrumSatellite</code> (e.g. <code>uint16_t</code>, <code>float</code>). </td></tr>
   </table>
   </dd>
 </dl>
@@ -186,7 +186,7 @@ template&lt;class T &gt; </div>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="classSpektrumSatellite.html">SpektrumSatellite</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramtype">SpektrumSatellite&lt; T &gt; &amp;&#160;</td>
           <td class="paramname"><em>satellite</em>&#160;</td>
         </tr>
         <tr>
@@ -251,7 +251,7 @@ template&lt;class T &gt; </div>
         <tr>
           <td class="memname">void <a class="el" href="classSpektrumCSV.html">SpektrumCSV</a>&lt; T &gt;::toString </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="classSpektrumSatellite.html">SpektrumSatellite</a>&lt; T &gt; &amp;&#160;</td>
+          <td class="paramtype">SpektrumSatellite&lt; T &gt; &amp;&#160;</td>
           <td class="paramname"><em>satellite</em>, </td>
         </tr>
         <tr>

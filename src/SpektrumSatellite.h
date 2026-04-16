@@ -1,5 +1,8 @@
 /**
- * Arduino API for the Spectrum Satellite Receiver. We support Arduinos, ESP32,
+ * @file SpektrumSatellite.h
+ * @brief Arduino API for Spektrum Satellite receivers.
+ *
+ * We support Arduinos, ESP32,
  * ESP8266 etc.
  * - Complete Implementation of Spec (See
  * https://www.spektrumrc.com/ProdInfo/Files/Remote%20Receiver%20Interfacing%20Rev%20A.pdf)
@@ -30,43 +33,61 @@
 #define BINDING_PULSE_DELAY_MS 100
 #define SPEKTRUM_SATELLITE_BPS 125000
 
-/// @brief Defines the number of falling pulses when Binding
+namespace spektrum_satellite {
+
+/**
+ * @enum BindMode
+ * @brief Number of bind pulses sent after power-up.
+ */
 enum BindMode {
-  Internal_DSM2_22ms = 3,
-  External_DSM2_22ms = 4,
-  Internal_DSM2_11ms = 5,
-  External_DSM2_11ms = 6,
-  Internal_DSMx_22ms = 7,
-  External_DSMx_22ms = 8,
-  Internal_DSMx_11ms = 9,
-  External_DSMx_11ms = 10
+  Internal_DSM2_22ms = 3,  ///< Internal DSM2 at 22ms.
+  External_DSM2_22ms = 4,  ///< External DSM2 at 22ms.
+  Internal_DSM2_11ms = 5,  ///< Internal DSM2 at 11ms.
+  External_DSM2_11ms = 6,  ///< External DSM2 at 11ms.
+  Internal_DSMx_22ms = 7,  ///< Internal DSMX at 22ms.
+  External_DSMx_22ms = 8,  ///< External DSMX at 22ms.
+  Internal_DSMx_11ms = 9,  ///< Internal DSMX at 11ms.
+  External_DSMx_11ms = 10  ///< External DSMX at 11ms.
 };
 
-/// @brief  Is it working ?
-enum Status { NotConnected, Binding, Receiving };
+/**
+ * @enum Status
+ * @brief Runtime receiver state.
+ */
+enum Status {
+  NotConnected,  ///< No recent valid frame.
+  Binding,       ///< Binding procedure in progress.
+  Receiving      ///< Frames are being received.
+};
 
-/// @brief  Define all 12 Available Channels
+/**
+ * @enum Channel
+ * @brief Supported channel indices.
+ */
 enum Channel {
-  Throttle,
-  Aileron,
-  Elevator,
-  Rudder,
-  Gear,
-  Aux1,
-  Aux2,
-  Aux3,
-  Aux4,
-  Aux5,
-  Aux6,
-  Aux7
+  Throttle,  ///< Throttle channel.
+  Aileron,   ///< Aileron channel.
+  Elevator,  ///< Elevator channel.
+  Rudder,    ///< Rudder channel.
+  Gear,      ///< Gear channel.
+  Aux1,      ///< Auxiliary channel 1.
+  Aux2,      ///< Auxiliary channel 2.
+  Aux3,      ///< Auxiliary channel 3.
+  Aux4,      ///< Auxiliary channel 4.
+  Aux5,      ///< Auxiliary channel 5.
+  Aux6,      ///< Auxiliary channel 6.
+  Aux7       ///< Auxiliary channel 7.
 };
 
-/// @brief Supported Systems
+/**
+ * @enum System
+ * @brief Spektrum protocol system identifiers.
+ */
 enum System {
-  DSM2_22MS_1024 = 0x01,
-  DSM2_11MS_2048 = 0x12,
-  DSMS_22MS_2048 = 0xa2,
-  DSMX_11MS_2048 = 0xb2
+  DSM2_22MS_1024 = 0x01,  ///< DSM2, 22ms, 1024 mode.
+  DSM2_11MS_2048 = 0x12,  ///< DSM2, 11ms, 2048 mode.
+  DSMS_22MS_2048 = 0xa2,  ///< DSMX/DSMS, 22ms, 2048 mode.
+  DSMX_11MS_2048 = 0xb2   ///< DSMX, 11ms, 2048 mode.
 };
 
 /// Header of a frame
@@ -588,3 +609,9 @@ class SpektrumSatellite {
     }
   }
 };
+
+} // namespace spektrum_satellite
+
+#ifdef ARDUINO
+using namespace spektrum_satellite;
+#endif
