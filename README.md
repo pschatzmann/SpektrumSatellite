@@ -169,7 +169,6 @@ void loop() {
 
 ```
 
-
 ## Installation
 You can download this project as ZIP and in the Arduino IDE use -> Sketch -> Include Library -> Add ZIP Library. 
 

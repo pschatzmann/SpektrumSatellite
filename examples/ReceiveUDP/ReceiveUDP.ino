@@ -22,8 +22,8 @@
 #endif
 
 
-char* ssid = "RemoteControl";                 //Change this to your router SSID.
-char* password =  "password123";        //Change this to your router password.
+const char* ssid = "RemoteControl";                 //Change this to your router SSID.
+const char* password =  "password123";        //Change this to your router password.
 const int udpPort = 6789;
 IPAddress gateway(192,168,4,0);
 IPAddress subnet(255,255,255,0);   

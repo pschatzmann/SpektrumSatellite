@@ -23,8 +23,8 @@
 #endif
 
 
-char* ssid = "RemoteControl";                
-char* password =  "password123";   
+const char* ssid = "RemoteControl";                
+const char* password =  "password123";   
 
 IPAddress local_IP(192,168,4,1);
 IPAddress gateway(192,168,4,0);
@@ -89,7 +89,5 @@ void loop() {
     csv.toString(satellite, buffer, 1024);
     satellite.sendData(buffer);   
     Serial.print((char*)buffer);      
-
-
   } 
 }

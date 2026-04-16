@@ -43,6 +43,61 @@ void testIs1024() {
   Serial.println(!satellite.is2048()?"ok" : "failed");
 }
 
+void testAutoDetect1024Scaling() {
+  Serial.println("***********************");
+  Serial.println("testAutoDetect1024Scaling");
+
+  SpektrumSatellite<uint16_t> sender(Serial);
+  sender.setBindingMode(Internal_DSM2_22ms);
+  sender.setChannelValueRange(0, 1000);
+  sender.setThrottle(1000);
+
+  SpektrumSatellite<uint16_t> receiver(Serial);
+  receiver.setBindingMode(Internal_DSMx_11ms);
+  receiver.setChannelValueRange(0, 1000);
+  receiver.parseFrame(sender.getSendBuffer(false));
+
+  Serial.print("testAutoDetect1024Scaling mode => ");
+  Serial.println(!receiver.is2048() ? "ok" : "failed");
+
+  Serial.print("testAutoDetect1024Scaling throttle => ");
+  Serial.println(receiver.getThrottle() == 1000 ? "ok" : "failed");
+}
+
+void testPerInstanceSystemDetection() {
+  Serial.println("***********************");
+  Serial.println("testPerInstanceSystemDetection");
+
+  SpektrumSatellite<uint16_t> sender2048(Serial);
+  sender2048.setBindingMode(Internal_DSMx_11ms);
+  sender2048.setChannelValueRange(0, 1000);
+  sender2048.setThrottle(1000);
+
+  SpektrumSatellite<uint16_t> sender1024(Serial);
+  sender1024.setBindingMode(Internal_DSM2_22ms);
+  sender1024.setChannelValueRange(0, 1000);
+  sender1024.setThrottle(1000);
+
+  SpektrumSatellite<uint16_t> receiverA(Serial);
+  receiverA.setBindingMode(Internal_DSMx_11ms);
+  receiverA.setChannelValueRange(0, 1000);
+  receiverA.parseFrame(sender2048.getSendBuffer(false));
+
+  SpektrumSatellite<uint16_t> receiverB(Serial);
+  receiverB.setBindingMode(Internal_DSMx_11ms);
+  receiverB.setChannelValueRange(0, 1000);
+  receiverB.parseFrame(sender1024.getSendBuffer(false));
+
+  Serial.print("testPerInstanceSystemDetection receiverA => ");
+  Serial.println(receiverA.is2048() ? "ok" : "failed");
+
+  Serial.print("testPerInstanceSystemDetection receiverB mode => ");
+  Serial.println(!receiverB.is2048() ? "ok" : "failed");
+
+  Serial.print("testPerInstanceSystemDetection receiverB throttle => ");
+  Serial.println(receiverB.getThrottle() == 1000 ? "ok" : "failed");
+}
+
 
 void testRange1000() {
   Serial.println("***********************");
@@ -190,6 +245,8 @@ void setup() {
   testScaling();
   testIs2048();
   testIs1024();
+  testAutoDetect1024Scaling();
+  testPerInstanceSystemDetection();
   testRange1000();
   testFloat();
   testHeader();

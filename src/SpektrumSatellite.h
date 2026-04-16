@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "Arduino.h"
+#include "Arduino.h"  // millis, Stream
 #include "Scaler.h"
 
 #define TRANSACTION_TIME 1000
@@ -30,7 +30,7 @@
 #define BINDING_PULSE_DELAY_MS 100
 #define SPEKTRUM_SATELLITE_BPS 125000
 
-// Defines the number of falling pulses when Binding
+/// @brief Defines the number of falling pulses when Binding
 enum BindMode {
   Internal_DSM2_22ms = 3,
   External_DSM2_22ms = 4,
@@ -42,10 +42,10 @@ enum BindMode {
   External_DSMx_11ms = 10
 };
 
-// Is it working ?
+/// @brief  Is it working ?
 enum Status { NotConnected, Binding, Receiving };
 
-// Define all 12 Available Channels
+/// @brief  Define all 12 Available Channels
 enum Channel {
   Throttle,
   Aileron,
@@ -61,7 +61,7 @@ enum Channel {
   Aux7
 };
 
-// Supported Systems
+/// @brief Supported Systems
 enum System {
   DSM2_22MS_1024 = 0x01,
   DSM2_11MS_2048 = 0x12,
@@ -69,7 +69,7 @@ enum System {
   DSMX_11MS_2048 = 0xb2
 };
 
-// Header of a frame
+/// Header of a frame
 union Header {
   uint16_t fades;
   struct __attribute__((__packed__)) Internal {
@@ -78,122 +78,424 @@ union Header {
   } internal;
 };
 
+/// Data packet structure for parsing and sending frames
 struct __attribute__((__packed__)) Data {
   Header header;
   uint16_t values[7];
 };
 
+/// 12 channels as strings
+const static char* ChannelNames[] = {
+    "Throttle", "Aileron", "Elevator", "Rudder", "Gear", "Aux1",
+    "Aux2",     "Aux3",    "Aux4",     "Aux5",   "Aux6", "Aux7"};
+
 /**
- * @brief Spktrum Sattellite Protocol API
+ * @brief Spektrum Satellite protocol API.
+ *
+ * Provides bind support, frame receive/transmit, channel access, optional
+ * scaling, protocol mode handling (1024/2048), and optional logging.
+ *
+ * @tparam T Public channel value type (e.g. uint16_t, int, float).
+ * @tparam ScalerT Optional custom scaler class (default is Scaler<T>).
  * @author Phil Schatzmann
  */
-template <class T = uint16_t>
+template <class T = uint16_t, class ScalerT = Scaler<T>>
 class SpektrumSatellite {
  public:
-  // Constructor
-  SpektrumSatellite(Stream& serial);
+  /// @brief Constructs the API using the given transport stream.
+  SpektrumSatellite(Stream& serial) {
+    // Internal_DSMx_11ms is recommended bind value
+    this->serial = &serial;
+    this->rangeMin = 0;
+    this->rangeMax = 0;
+    this->isSwapBytes = false;
+    this->isSystemReported = false;
+    this->isChannelRangeConfigured = false;
+    setBindingMode(Internal_DSMx_11ms);
 
-  // Defines the binding mode
-  void setBindingMode(BindMode bindMode);
+    // setup Initial Status
+    this->status = NotConnected;
 
-  // Set the receiver in binding mode
-  void startBinding(unsigned powerPin, unsigned rxPin);
+    // check endianness
+    int n = 1;
+    if (*(char*)&n == 1) {
+      // little endian if true
+      this->isSwapBytes = true;
+    }
+  }
 
-  // Receive a data record from the Satellite Receiver
-  bool getFrame(int timeout = DEFAULT_RECEIVING_TIMEOUT);
+  /// @brief Sets the receiver binding mode.
+  void setBindingMode(BindMode bindMode) {
+    log("setBindingMode");
+    this->bindMode = bindMode;
+    this->isSystemReported = false;
 
-  // Gets the scaled value for the indicated channel
-  T getChannelValue(Channel channelId);
-  T getThrottle();
-  T getAileron();
-  T getElevator();
-  T getRudder();
-  T getGear();
-  T getAux1();
-  T getAux2();
-  T getAux3();
-  T getAux4();
-  T getAux5();
-  T getAux6();
-  T getAux7();
+    // update the system information
+    if (bindMode == Internal_DSM2_22ms || bindMode == External_DSM2_22ms) {
+      setSystem(DSM2_22MS_1024);
+    } else if (bindMode == Internal_DSM2_11ms ||
+               bindMode == External_DSM2_11ms) {
+      setSystem(DSM2_11MS_2048);
+    } else if (bindMode == Internal_DSMx_11ms ||
+               bindMode == External_DSMx_11ms) {
+      setSystem(DSMX_11MS_2048);
+    } else if (bindMode == Internal_DSMx_22ms ||
+               bindMode == External_DSMx_22ms) {
+      setSystem(DSMS_22MS_2048);
+    }
 
-  void setChannelValue(Channel channelId, T value);
-  void setThrottle(T value);
-  void setAileron(T value);
-  void setElevator(T value);
-  void setRudder(T value);
-  void setGear(T value);
-  void setAux1(T value);
-  void setAux2(T value);
-  void setAux3(T value);
-  void setAux4(T value);
-  void setAux5(T value);
-  void setAux6(T value);
-  void setAux7(T value);
+    // update the internal flag
+    if (bindMode == Internal_DSM2_11ms || bindMode == Internal_DSM2_22ms ||
+        bindMode == Internal_DSMx_11ms || bindMode == Internal_DSMx_22ms) {
+      isInternalFlag = true;
+    } else {
+      isInternalFlag = false;
+    }
 
-  void sendData();
-  void sendData(uint8_t* str);
+    log("-> isInternal:", isInternal() ? "true" : "false");
+    logHex("-> system:", system);
+  }
 
-  // Checks that we did not time out
-  bool isConnected();
-  bool isConnected(long timeoutMs);
+  /// @brief Starts bind sequence via power and RX pins.
+  void startBinding(unsigned powerPin, unsigned rxPin) {
+    // switch off serial interface
+    if (serial) {
+      log("startBinding");
 
-  // wait for any data
-  void waitForData();
+      pinMode(rxPin, OUTPUT);       // sets the digital pin as output
+      digitalWrite(rxPin, LOW);     // make sure that the pin off
+      pinMode(powerPin, OUTPUT);    // sets the digital pin as output
+      digitalWrite(powerPin, LOW);  // make sure that the pin off
+      digitalWrite(rxPin, HIGH);    // set initial state to high
+      delay(2000);
 
-  // Provides the channel name as string
-  const char* getChannelName(Channel channelId);
+      // To put a receiver into bind mode, within 200ms of power application
+      // the host device needs to issue a series of falling pulses
+      pinMode(powerPin, OUTPUT);     // sets the digital pin as output
+      digitalWrite(powerPin, HIGH);  // make sure that the pin off
+      delay(50);
 
-  // Defines the maximum value that we expect or provide to the API
-  void setChannelValueRange(T min, T max);
+      log("-> number of pulses: ", bindMode);
 
-  // Provides access to the Scaler
-  Scaler<T>* getScaler();
+      for (int j = 0; j < bindMode; j++) {
+        digitalWrite(rxPin, HIGH);                  // sets the digital pin on
+        delayMicroseconds(BINDING_PULSE_DELAY_MS);  // waits
+        digitalWrite(rxPin, LOW);                   // sets the digital pin off
+        delayMicroseconds(BINDING_PULSE_DELAY_MS);  // waits
+      }
 
-  // Sets the system which defines the data format (e.g. 1024 or 2048 servo
-  // data)
-  void setSystem(System system);
+      log("-> number of pulses DONE");
 
-  // Determines the system
-  System getSystem();
+      delay(500);
+      pinMode(rxPin, INPUT);  // sets the pin as input
+    }
+  }
 
-  // checks if the system is valid
-  boolean isValidSystem(int system);
+  /// @brief Reads and parses one frame from the stream.
+  bool getFrame(int transactionTimeMs = DEFAULT_RECEIVING_TIMEOUT) {
+    short inByte;
+    byte inData[SEND_BUFFER_SIZE];
+    bool result = false;
+    long available = serial->available();
 
-  // checks if binding is in internal mode
-  boolean isInternal();
+    // 16-byte data packet every 11ms or 22ms
+    if (available >= 16) {
+      timeOfLastRead = millis();
+      // resynchronize and use last data
+      if (!processAllData && available > 16) {
+        long diff = available - 16;
+        log("skipping number of bytes:", diff);
+        // skip unnecessary data
+        for (int j = 0; j < diff; j++) serial->read();
+      }
 
-  // switch endianness if necessary for processors which are little endian
-  void switchEndianness();
+      // read the latest data packet
+      inByte = serial->readBytes(inData, 16);
+      if (inByte != 16) {
+        log("We could not read all data");
+        result = false;
+      } else {
+        // check if we processed the data within indicated time period
+        result = isConnected(transactionTimeMs);
+        if (result) {
+          parseFrame(inData);
+          // check if the frame is valid
+          result = isValidSystem(this->system);
+          status = Receiving;
 
-  // checks if the biggest number is 2048 (instead of 1024)
-  bool is2048();
+          // log status
+          logFrame(available, result);
+        } else {
+          log("Frame ignored because of timeout");
+        }
+      }
+    }
 
-  // Determines the fades
-  uint16_t getFades();
+    return result;
+  }
 
-  Status getStatus();
+  /// @brief Returns the scaled value of the given channel.
+  T getChannelValue(Channel channelId) {
+    if (channelId >= Throttle && channelId <= Aux7) {
+      return scaler.scale(channelValues[channelId]);
+    } else {
+      log("Invalid Channel Number:", static_cast<int>(channelId));
+      return 0;
+    }
+  }
+  /// @brief Returns the scaled `Throttle` channel value.
+  T getThrottle() { return getChannelValue(Throttle); }
+  /// @brief Returns the scaled `Aileron` channel value.
+  T getAileron() { return getChannelValue(Aileron); }
+  /// @brief Returns the scaled `Elevator` channel value.
+  T getElevator() { return getChannelValue(Elevator); }
+  /// @brief Returns the scaled `Rudder` channel value.
+  T getRudder() { return getChannelValue(Rudder); }
+  /// @brief Returns the scaled `Gear` channel value.
+  T getGear() { return getChannelValue(Gear); }
+  /// @brief Returns the scaled `Aux1` channel value.
+  T getAux1() { return getChannelValue(Aux1); }
+  /// @brief Returns the scaled `Aux2` channel value.
+  T getAux2() { return getChannelValue(Aux2); }
+  /// @brief Returns the scaled `Aux3` channel value.
+  T getAux3() { return getChannelValue(Aux3); }
+  /// @brief Returns the scaled `Aux4` channel value.
+  T getAux4() { return getChannelValue(Aux4); }
+  /// @brief Returns the scaled `Aux5` channel value.
+  T getAux5() { return getChannelValue(Aux5); }
+  /// @brief Returns the scaled `Aux6` channel value.
+  T getAux6() { return getChannelValue(Aux6); }
+  /// @brief Returns the scaled `Aux7` channel value.
+  T getAux7() { return getChannelValue(Aux7); }
 
-  // Defines that we need to process all data (use on reliable connectins only)
-  void setProcessAllData(bool flag);
+  /// @brief Sets a channel value using the public value type.
+  void setChannelValue(Channel channelId, T value) {
+    if (channelId >= Throttle && channelId <= Aux7) {
+      channelValues[channelId] = scaler.deScale(value);
+      if (channelId >= Aux1) {
+        isSendAuxData = true;
+      }
+    } else {
+      log("Invalid Channel Number:", static_cast<int>(channelId));
+    }
+  }
+  /// @brief Sets the `Throttle` channel value.
+  void setThrottle(T value) { setChannelValue(Throttle, value); }
+  /// @brief Sets the `Aileron` channel value.
+  void setAileron(T value) { setChannelValue(Aileron, value); }
+  /// @brief Sets the `Elevator` channel value.
+  void setElevator(T value) { setChannelValue(Elevator, value); }
+  /// @brief Sets the `Rudder` channel value.
+  void setRudder(T value) { setChannelValue(Rudder, value); }
+  /// @brief Sets the `Gear` channel value.
+  void setGear(T value) { setChannelValue(Gear, value); }
+  /// @brief Sets the `Aux1` channel value.
+  void setAux1(T value) { setChannelValue(Aux1, value); }
+  /// @brief Sets the `Aux2` channel value.
+  void setAux2(T value) { setChannelValue(Aux2, value); }
+  /// @brief Sets the `Aux3` channel value.
+  void setAux3(T value) { setChannelValue(Aux3, value); }
+  /// @brief Sets the `Aux4` channel value.
+  void setAux4(T value) { setChannelValue(Aux4, value); }
+  /// @brief Sets the `Aux5` channel value.
+  void setAux5(T value) { setChannelValue(Aux5, value); }
+  /// @brief Sets the `Aux6` channel value.
+  void setAux6(T value) { setChannelValue(Aux6, value); }
+  /// @brief Sets the `Aux7` channel value.
+  void setAux7(T value) { setChannelValue(Aux7, value); }
 
-  // == usually not needed but in case when you need to access the data
-  bool parseFrame(byte* inData);
-  bool parseFrame(Data* inData);
-  Data* getSendBuffer(boolean auxData);
-  Data* getSendBuffer();
-  // logging
-  void setLog(Stream& log);
-  void setLogMod(long value);
-  void log(const char*);
-  void log1(const char*);
-  void log(const char*, const char*);
-  void log(const char*, int value);
-  void logHex(const char*, int value);
-  // provides the unconverted channel values
-  uint16_t* getChannelValuesRaw();
+  /// @brief Sends a binary Spektrum frame.
+  void sendData() {
+    if (sendCount > 0 && sendCount++ % logMod == 0) {
+      log("sendData");
+    }
+    Data* data = getSendBuffer();
+    serial->write((byte*)data, SEND_BUFFER_SIZE);
 
- private:
+    // send Aux if necessary
+    if (isSendAuxData) {
+      Data* aux = getSendBuffer(true);
+      serial->write((byte*)aux, SEND_BUFFER_SIZE);
+    }
+  }
+  /// @brief Sends textual data through the stream.
+  void sendData(uint8_t* str) {
+    if (logMod > 0 && sendCount++ % logMod == 0) {
+      log((char*)str);
+    }
+    serial->print((char*)str);
+    serial->flush();
+  }
+
+  /// @brief Returns `true` if the link is connected.
+  bool isConnected() { return isConnected(TRANSACTION_TIME); }
+  /// @brief Returns `true` if connected within the given timeout.
+  bool isConnected(long timeoutMs) {
+    return (millis() - timeOfLastRead < timeoutMs);
+  }
+
+  /// @brief Blocks until at least one byte is available.
+  void waitForData() {
+    log("waitForData");
+    while (!serial->available()) {
+      log1(".");
+      delay(1000);
+    }
+  }
+
+  /// @brief Returns the display name of a channel.
+  const char* getChannelName(Channel channelId) {
+    return ChannelNames[channelId];
+  }
+
+  /// @brief Sets output scaling range for channel getters/setters.
+  void setChannelValueRange(T min, T max) {
+    log("setChannelValueRange");
+    rangeMin = min;
+    rangeMax = max;
+    isChannelRangeConfigured = true;
+    scaler.setValues(0, is2048() ? 2048 : 1024, min, max);
+    log("setChannelValueRange <-");
+  }
+
+  /// @brief Returns direct access to the internal scaler.
+  ScalerT* getScaler() { return &this->scaler; }
+
+  /// @brief Sets the protocol system/mode (e.g. 1024 or 2048).
+  void setSystem(System system) {
+    logHex("setSystem:", system);
+    this->system = system;
+
+    if (system == DSM2_22MS_1024) {
+      maskCHANID = MASK_1024_CHANID;
+      maskVALUE = MASK_1024_SXPOS;
+    } else {
+      maskCHANID = MASK_2048_CHANID;
+      maskVALUE = MASK_2048_SXPOS;
+    }
+
+    if (isChannelRangeConfigured) {
+      scaler.setValues(0, is2048() ? 2048 : 1024, rangeMin, rangeMax);
+    }
+  }
+
+  /// @brief Returns the active protocol system.
+  System getSystem() { return this->system; }
+
+  /// @brief Validates a system ID against supported values.
+  boolean isValidSystem(int system) {
+    bool result = false;
+    if (isInternal()) {
+      if (system == DSM2_22MS_1024 || system == DSM2_11MS_2048 ||
+          system == DSMS_22MS_2048 || system == DSMX_11MS_2048) {
+        result = true;
+      }
+      if (!result) {
+        log("isValidSystem: ", result ? "true" : "false");
+        logHex("system: ", system);
+      }
+    } else {
+      result = true;
+    }
+    return result;
+  }
+
+  /// @brief Returns `true` if current bind mode is internal.
+  boolean isInternal() { return this->isInternalFlag; }
+
+  /// @brief Toggles endianness swapping for frame fields.
+  void switchEndianness() { this->isSwapBytes = !this->isSwapBytes; }
+
+  /// @brief Returns `true` when using 2048-resolution mode.
+  bool is2048() { return this->system == DSM2_22MS_1024 ? false : true; }
+
+  /// @brief Returns the latest fades value from received data.
+  uint16_t getFades() { return this->fades; }
+
+  /// @brief Returns current receiver status.
+  Status getStatus() { return this->status; }
+
+  /// @brief Enables/disables processing of all buffered bytes.
+  void setProcessAllData(bool flag) { processAllData = flag; }
+
+  /// @brief Parses a raw 16-byte frame.
+  bool parseFrame(byte* inData) { return parseFrame((Data*)inData); }
+  /// @brief Parses a typed frame structure.
+  bool parseFrame(Data* inData) {
+    Data* data = (Data*)inData;
+    // a frame is 16 bytes -> 7 channels + fades
+    if (isInternal()) {
+      this->fades = data->header.internal.fades;
+      System recevedSystem = (System)data->header.internal.system;
+      if (!isSystemReported || recevedSystem != getSystem()) {
+        logHex("System from the Satellite:", recevedSystem);
+        isSystemReported = true;
+      }
+      if (recevedSystem != getSystem()) {
+        if (isValidSystem(recevedSystem))
+          setSystem(recevedSystem);
+        else
+          logHex("Unexpected system", recevedSystem);
+      }
+    } else {
+      this->fades = data->header.fades;
+    }
+
+    uint16_t channelShift = is2048() ? 11 : 10;
+    for (int i = 0; i < 7; i++) {
+      uint16_t inValue = data->values[i];
+      swapBytes(&inValue);
+      uint16_t channelID = (inValue & maskCHANID) >> channelShift;
+      uint16_t channelValue = inValue & maskVALUE;
+
+      if (channelID >= 0 && channelID < MAX_CHANNELS) {
+        channelValues[channelID] = channelValue;
+      }
+    }
+    return true;
+  }
+  /// @brief Builds a frame buffer for sending.
+  Data* getSendBuffer(boolean auxData) {
+    // Clear only the values array and header
+    for (int i = 0; i < 7; ++i) dataPacket.values[i] = 0;
+    dataPacket.header.fades = 0;
+
+    uint16_t channelShift = is2048() ? 11 : 10;
+    if (auxData) {
+      for (int j = 6; j < MAX_CHANNELS && (j - 6) < 7; ++j) {
+        uint16_t value = (channelValues[j] & maskVALUE) | (j << channelShift);
+        swapBytes(&value);
+        dataPacket.values[j - 6] = value;
+      }
+    } else {
+      for (int j = 0; j < 7; ++j) {
+        uint16_t value = (channelValues[j] & maskVALUE) | (j << channelShift);
+        swapBytes(&value);
+        dataPacket.values[j] = value;
+      }
+    }
+
+    if (isInternal()) {
+      dataPacket.header.internal.fades = this->fades;
+      dataPacket.header.internal.system = this->system;
+    } else {
+      dataPacket.header.fades = this->fades;
+    }
+
+    return &dataPacket;
+  }
+  /// @brief Builds the primary frame buffer for sending.
+  Data* getSendBuffer() { return getSendBuffer(false); }
+
+  /// @brief Sets the logging output stream.
+  void setLog(Stream& logSer) { this->serialLog = &logSer; }
+  /// @brief Sets logging interval modulo.
+  void setLogMod(long value) { this->logMod = value; }
+
+  /// @brief Returns direct access to raw (unscaled) channel values.
+  uint16_t* getChannelValuesRaw() { return channelValues; }
+
+ protected:
   uint16_t channelValues[12];
   Data dataPacket;  //;uint16_t sendValues[7];
   unsigned long timeOfLastRead;
@@ -205,609 +507,84 @@ class SpektrumSatellite {
   uint16_t maskVALUE;
   uint16_t fades;
   System system;
+  T rangeMin = 0;
+  T rangeMax = 100;
   boolean isInternalFlag;
   boolean isSendAuxData;
   boolean isSwapBytes;
+  boolean isSystemReported;
+  boolean isChannelRangeConfigured;
   boolean processAllData = false;
-
   Stream* serial;
   Stream* serialLog = NULL;
-  Scaler<T> scaler;
+  ScalerT scaler;
   BindMode bindMode;
   Status status;
   long logMod = 1000;
 
+  /// @brief Logs a message.
+  void log(const char* str) {
+    if (serialLog == NULL) return;
+    serialLog->println(str);
+  }
+  /// @brief Logs a lightweight heartbeat marker.
+  void log1(const char*) {
+    if (serialLog == NULL) return;
+    serialLog->print(" ");
+  }
+  /// @brief Logs two strings.
+  void log(const char* str, const char* str1) {
+    if (serialLog == NULL) return;
+    serialLog->print(str);
+    serialLog->print(" ");
+    serialLog->println(str1);
+  }
+  /// @brief Logs a string and integer value.
+  void log(const char* str, int value) {
+    if (serialLog == NULL) return;
+    serialLog->print(str);
+    serialLog->print(" ");
+    serialLog->println(value);
+  }
+  /// @brief Logs a string and hexadecimal value.
+  void logHex(const char* str, int value) {
+    if (serialLog == NULL) return;
+    serialLog->print(str);
+    serialLog->print(" ");
+    serialLog->println(value, HEX);
+  }
+
   // private methods
-  void logFrame(long available, bool result);
-  void swapBytes(uint16_t* value);
-};
-
-// 12 channels
-const static char* ChannelNames[] = {
-    "Throttle", "Aileron", "Elevator", "Rudder", "Gear", "Aux1",
-    "Aux2",     "Aux3",    "Aux4",     "Aux5",   "Aux6", "Aux7"};
-
-
-
-template <class T>
-SpektrumSatellite<T>::SpektrumSatellite(Stream& serial) {
-  // Internal_DSMx_11ms is recommended bind value
-  this->serial = &serial;
-  setBindingMode(Internal_DSMx_11ms);
-
-  // setup Initial Status
-  this->status = NotConnected;
-
-  // check endianness
-  int n = 1;
-  if (*(char*)&n == 1) {
-    // little endian if true
-    this->isSwapBytes = true;
-  }
-}
-
-template <class T>
-Status SpektrumSatellite<T>::getStatus() {
-  return this->status;
-}
-
-template <class T>
-void SpektrumSatellite<T>::setBindingMode(BindMode bindMode) {
-  log("setBindingMode");
-  this->bindMode = bindMode;
-
-  // update the system information
-  if (bindMode == Internal_DSM2_22ms || bindMode == External_DSM2_22ms) {
-    setSystem(DSM2_22MS_1024);
-  } else if (bindMode == Internal_DSM2_11ms || bindMode == External_DSM2_11ms) {
-    setSystem(DSM2_11MS_2048);
-  } else if (bindMode == Internal_DSMx_11ms || bindMode == External_DSMx_11ms) {
-    setSystem(DSMX_11MS_2048);
-  } else if (bindMode == Internal_DSMx_22ms || bindMode == External_DSMx_22ms) {
-    setSystem(DSMS_22MS_2048);
-  }
-
-  // update the internal flag
-  if (bindMode == Internal_DSM2_11ms || bindMode == Internal_DSM2_22ms ||
-      bindMode == Internal_DSMx_11ms || bindMode == Internal_DSMx_22ms) {
-    isInternalFlag = true;
-  } else {
-    isInternalFlag = false;
-  }
-
-  log("-> isInternal:", isInternal() ? "true" : "false");
-  logHex("-> system:", system);
-}
-
-template <class T>
-System SpektrumSatellite<T>::getSystem() {
-  return this->system;
-}
-
-template <class T>
-void SpektrumSatellite<T>::setSystem(System system) {
-  logHex("setSystem:", system);
-  this->system = system;
-
-  if (system == DSM2_22MS_1024) {
-    maskCHANID = MASK_1024_CHANID;
-    maskVALUE = MASK_1024_SXPOS;
-  } else {
-    maskCHANID = MASK_2048_CHANID;
-    maskVALUE = MASK_2048_SXPOS;
-  }
-}
-
-template <class T>
-boolean SpektrumSatellite<T>::isInternal() {
-  return this->isInternalFlag;
-}
-
-template <class T>
-boolean SpektrumSatellite<T>::isValidSystem(int system) {
-  bool result = false;
-  if (isInternal()) {
-    // check system
-    if (system == DSM2_22MS_1024 || system == DSM2_11MS_2048 ||
-        system == DSMS_22MS_2048 || system == DSMX_11MS_2048) {
-      result = true;
-    }
-    if (!result) {
-      log("isValidSystem: ", result ? "true" : "false");
-      logHex("system: ", system);
-    }
-  } else {
-    // system has no meaning
-    result = true;
-  }
-  return result;
-}
-
-template <class T>
-void SpektrumSatellite<T>::setProcessAllData(bool flag) {
-  processAllData = flag;
-}
-
-template <class T>
-bool SpektrumSatellite<T>::parseFrame(byte* inData) {
-  return parseFrame((Data*)inData);
-}
-
-template <class T>
-bool SpektrumSatellite<T>::parseFrame(Data* inData) {
-  Data* data = (Data*)inData;
-  static bool systemReported = false;
-  // a frame is 16 bytes -> 7 channels + fades
-  // determine system and fades
-  if (isInternal()) {
-    this->fades = data->header.internal.fades;
-    if (!systemReported) {
-      System recevedSystem = (System)data->header.internal.system;
-      logHex("System from the Satellite:", recevedSystem);
-      systemReported = true;
-      if (recevedSystem != getSystem()) {
-        if (isValidSystem(recevedSystem))
-          setSystem(recevedSystem);
-        else
-          logHex("Unexpected system", recevedSystem);
-      }
-    }
-  } else {
-    this->fades = data->header.fades;
-  }
-
-  // determine channel values
-  uint16_t channelShift = is2048() ? 11 : 10;
-  for (int i = 0; i < 7; i++) {
-    uint16_t inValue = data->values[i];
-    swapBytes(&inValue);
-    uint16_t channelID = (inValue & maskCHANID) >> channelShift;
-    uint16_t channelValue = inValue & maskVALUE;
-
-    // Serial.print(inValue);
-    // Serial.print(" / ");
-    // Serial.print(channelID);
-    // Serial.print("=>");
-    // Serial.println(channelValue);
-
-    if (channelID >= 0 && channelID < MAX_CHANNELS) {
-      channelValues[channelID] = channelValue;
+  void logFrame(long available, bool result) {
+    if (result) {
+      successCount++;
     } else {
-      // log("Invalid Channel in parseFrame: ",channelID);
+      failCount++;
     }
-  }
-  return true;
-}
-
-template <class T>
-void SpektrumSatellite<T>::swapBytes(uint16_t* value) {
-  if (isSwapBytes) {
-    *value = ((*value << 8) & 0xff00) | ((*value >> 8) & 0x00ff);
-  }
-}
-
-template <class T>
-void SpektrumSatellite<T>::switchEndianness() {
-  this->isSwapBytes = !this->isSwapBytes;
-}
-
-template <class T>
-bool SpektrumSatellite<T>::getFrame(int transactionTimeMs) {
-  short inByte;
-  byte inData[SEND_BUFFER_SIZE];
-  bool result = false;
-  long available = serial->available();
-
-  //  16-byte data packet every 11ms or 22ms,
-  if (available >= 16) {
-    timeOfLastRead = millis();
-    // resychronize and use last data
-    if (!processAllData && available > 16) {
-      long diff = available - 16;
-      log("skipping number of bytes:", diff);
-      // skip unnecessary data
-      for (int j = 0; j < diff; j++) serial->read();
-    }
-
-    // read the latest data packet
-    inByte = serial->readBytes(inData, 16);
-    if (inByte != 16) {
-      log("We could not read all data");
-      result = false;
-    } else {
-      // check if we processed the data within the indicated time period
-      result = isConnected(transactionTimeMs);
-      if (result) {
-        parseFrame(inData);
-        // check if the frame is valid
-        result = isValidSystem(this->system);
-        status = Receiving;
-
-        // log the status
-        logFrame(available, result);
+    if (logMod > 0) {
+      if (getStatus() == Receiving) {
+        if (frameCount % logMod == 0) {
+          log("getFrame");
+          log("available data:", available);
+          log("-> isConnected:", isConnected() ? "true" : "false");
+          log("-> isValidSystem:",
+              isValidSystem(this->system) ? "true" : "false");
+          log("-> frameCount:", frameCount);
+          log("-> successCount:", successCount);
+          log("-> failCount:", failCount);
+        }
       } else {
-        log("Frame ignored because of timeout");
+        if (serialLog != NULL) {
+          serialLog->print(available > 0 ? "+" : ".");
+        }
       }
     }
+    frameCount++;
   }
 
-  return result;
-}
-
-template <class T>
-T SpektrumSatellite<T>::getThrottle() {
-  return getChannelValue(Throttle);
-}
-
-template <class T>
-T SpektrumSatellite<T>::getAileron() {
-  return getChannelValue(Aileron);
-}
-
-template <class T>
-T SpektrumSatellite<T>::getElevator() {
-  return getChannelValue(Elevator);
-}
-
-template <class T>
-T SpektrumSatellite<T>::getRudder() {
-  return getChannelValue(Rudder);
-}
-
-template <class T>
-T SpektrumSatellite<T>::getGear() {
-  return getChannelValue(Gear);
-}
-
-template <class T>
-T SpektrumSatellite<T>::getAux1() {
-  return getChannelValue(Aux1);
-}
-
-template <class T>
-T SpektrumSatellite<T>::getAux2() {
-  return getChannelValue(Aux2);
-}
-
-template <class T>
-T SpektrumSatellite<T>::getAux3() {
-  return getChannelValue(Aux3);
-}
-
-template <class T>
-T SpektrumSatellite<T>::getAux4() {
-  return getChannelValue(Aux4);
-}
-
-template <class T>
-T SpektrumSatellite<T>::getAux5() {
-  return getChannelValue(Aux5);
-}
-
-template <class T>
-T SpektrumSatellite<T>::getAux6() {
-  return getChannelValue(Aux6);
-}
-
-template <class T>
-T SpektrumSatellite<T>::getAux7() {
-  return getChannelValue(Aux7);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setChannelValue(Channel channelId, T value) {
-  if (channelId >= Throttle && channelId <= Aux7) {
-    channelValues[channelId] = scaler.deScale(value);
-    if (channelId >= Aux1) {
-      isSendAuxData = true;
-    }
-  } else {
-    log("Invalid Channel Number:", static_cast<int>(channelId));
-  }
-}
-
-template <class T>
-T SpektrumSatellite<T>::getChannelValue(Channel channelId) {
-  if (channelId >= Throttle && channelId <= Aux7) {
-    return scaler.scale(channelValues[channelId]);
-  } else {
-    log("Invalid Channel Number:", static_cast<int>(channelId));
-    return 0;
-  }
-}
-
-template <class T>
-const char* SpektrumSatellite<T>::getChannelName(Channel channelId) {
-  return ChannelNames[channelId];
-}
-
-template <class T>
-void SpektrumSatellite<T>::setThrottle(T value) {
-  setChannelValue(Throttle, value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setAileron(T value) {
-  setChannelValue(Aileron, value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setElevator(T value) {
-  setChannelValue(Elevator, value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setRudder(T value) {
-  setChannelValue(Rudder, value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setGear(T value) {
-  setChannelValue(Gear, value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setAux1(T value) {
-  setChannelValue(Aux1, value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setAux2(T value) {
-  setChannelValue(Aux2, value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setAux3(T value) {
-  setChannelValue(Aux3, value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setAux4(T value) {
-  setChannelValue(Aux4, value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setAux5(T value) {
-  setChannelValue(Aux5, value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setAux6(T value) {
-  setChannelValue(Aux6, value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setAux7(T value) {
-  setChannelValue(Aux7, value);
-}
-
-template <class T>
-Data* SpektrumSatellite<T>::getSendBuffer() {
-  return getSendBuffer(false);
-}
-
-template <class T>
-Data* SpektrumSatellite<T>::getSendBuffer(boolean auxData) {
-  // Clear only the values array and header
-  for (int i = 0; i < 7; ++i) dataPacket.values[i] = 0;
-  dataPacket.header.fades = 0;
-
-  // determine the position of the index info
-  uint16_t channelShift = is2048() ? 11 : 10;
-  if (auxData) {
-    // Fill values[0..5] with Aux1..Aux6 (j=6..11), values[6] with Aux7 (j=12,
-    // if present)
-    for (int j = 6; j < MAX_CHANNELS && (j - 6) < 7; ++j) {
-      dataPacket.values[j - 6] =
-          (channelValues[j] & maskVALUE) | (j << channelShift);
-      swapBytes(&dataPacket.values[j - 6]);
-    }
-  } else {
-    // Fill values[0..6] with Throttle..Aux6 (j=0..6)
-    for (int j = 0; j < 7; ++j) {
-      dataPacket.values[j] =
-          (channelValues[j] & maskVALUE) | (j << channelShift);
-      swapBytes(&dataPacket.values[j]);
+  void swapBytes(uint16_t* value) {
+    if (isSwapBytes) {
+      *value = ((*value << 8) & 0xff00) | ((*value >> 8) & 0x00ff);
     }
   }
-
-  // if the mode is internal we need to add the system id
-  Header* header = &(dataPacket.header);
-  if (isInternal()) {
-    header->internal.fades = this->fades;
-    header->internal.system = this->system;
-  } else {
-    header->fades = this->fades;
-  }
-
-  return &dataPacket;
-}
-
-template <class T>
-void SpektrumSatellite<T>::sendData() {
-  if (sendCount > 0 && sendCount++ % logMod == 0) {
-    log("sendData");
-  }
-  Data* data = getSendBuffer();
-  serial->write((byte*)data, SEND_BUFFER_SIZE);
-
-  // send Aux if necessary
-  if (isSendAuxData) {
-    Data* data = getSendBuffer(true);
-    serial->write((byte*)data, SEND_BUFFER_SIZE);
-  }
-}
-
-template <class T>
-void SpektrumSatellite<T>::sendData(uint8_t* str) {
-  if (logMod > 0 && sendCount++ % logMod == 0) {
-    log((char*)str);
-  }
-  serial->print((char*)str);
-  serial->flush();
-}
-
-template <class T>
-bool SpektrumSatellite<T>::isConnected() {
-  return isConnected(TRANSACTION_TIME);
-}
-
-template <class T>
-bool SpektrumSatellite<T>::isConnected(long transactionTime) {
-  return (millis() - timeOfLastRead < transactionTime);
-}
-
-template <class T>
-void SpektrumSatellite<T>::waitForData() {
-  log("waitForData");
-  while (!serial->available()) {
-    log1(".");
-    delay(1000);
-  }
-}
-
-template <class T>
-void SpektrumSatellite<T>::setChannelValueRange(T min, T max) {
-  log("setChannelValueRange");
-  // set ouput value range
-  scaler.setActive(true);
-  T inMax = is2048() ? 2048 : 1024;
-  scaler.setValues(0, inMax, min, max);
-  log("setChannelValueRange <-");
-}
-
-template <class T>
-bool SpektrumSatellite<T>::is2048() {
-  return this->system == DSM2_22MS_1024 ? false : true;
-}
-
-template <class T>
-uint16_t SpektrumSatellite<T>::getFades() {
-  return this->fades;
-}
-
-template <class T>
-Scaler<T>* SpektrumSatellite<T>::getScaler() {
-  return &this.scaler;
-}
-
-template <class T>
-void SpektrumSatellite<T>::log(const char* str) {
-  if (serialLog == NULL) return;
-  serialLog->println(str);
-}
-
-template <class T>
-void SpektrumSatellite<T>::log(const char* str, const char* str1) {
-  if (serialLog == NULL) return;
-  serialLog->print(str);
-  serialLog->print(" ");
-  serialLog->println(str1);
-}
-
-template <class T>
-void SpektrumSatellite<T>::log1(const char* str) {
-  if (serialLog == NULL) return;
-  serialLog->print(" ");
-}
-
-template <class T>
-void SpektrumSatellite<T>::log(const char* str, int value) {
-  if (serialLog == NULL) return;
-  serialLog->print(str);
-  serialLog->print(" ");
-  serialLog->println(value);
-}
-
-template <class T>
-void SpektrumSatellite<T>::logHex(const char* str, int value) {
-  if (serialLog == NULL) return;
-  serialLog->print(str);
-  serialLog->print(" ");
-  serialLog->println(value, HEX);
-}
-
-template <class T>
-void SpektrumSatellite<T>::setLogMod(long value) {
-  this->logMod = value;
-}
-
-template <class T>
-void SpektrumSatellite<T>::logFrame(long available, bool result) {
-  if (result) {
-    successCount++;
-  } else {
-    failCount++;
-  }
-  if (logMod > 0) {
-    if (getStatus() == Receiving) {
-      if (frameCount % logMod == 0) {
-        log("getFrame");
-        log("available data:", available);
-        log("-> isConnected:", isConnected() ? "true" : "false");
-        log("-> isValidSystem:",
-            isValidSystem(this->system) ? "true" : "false");
-        log("-> frameCount:", frameCount);
-        log("-> successCount:", successCount);
-        log("-> failCount:", failCount);
-      }
-    } else {
-      if (serialLog != NULL) {
-        serialLog->print(available > 0 ? "+" : ".");
-      }
-    }
-  }
-  frameCount++;
-}
-
-template <class T>
-void SpektrumSatellite<T>::setLog(Stream& logSer) {
-  this->serialLog = &logSer;
-}
-
-template <class T>
-uint16_t* SpektrumSatellite<T>::getChannelValuesRaw() {
-  return channelValues;
-}
-
-/**
- * The Spektrum Satellite power pin i using 3.3VDC +/-5%, 20mA max. However for
- * the ESP8266 The maximum current that can be drawn from a single GPIO pin is
- * 12mA.
- */
-template <class T>
-void SpektrumSatellite<T>::startBinding(unsigned powerPin, unsigned rxPin) {
-  // switch off serial interface
-  if (serial) {
-    log("startBinding");
-
-    pinMode(rxPin, OUTPUT);       // sets the digital pin as output
-    digitalWrite(rxPin, LOW);     // make sure that the pin off
-    pinMode(powerPin, OUTPUT);    // sets the digital pin as output
-    digitalWrite(powerPin, LOW);  // make sure that the pin off
-    digitalWrite(rxPin, HIGH);    // set initial state to high
-    delay(2000);
-
-    // To put a receiver into bind mode, within 200ms of power application the
-    // host device needs to issue a series of falling pulses
-    pinMode(powerPin, OUTPUT);     // sets the digital pin as output
-    digitalWrite(powerPin, HIGH);  // make sure that the pin off
-    delay(50);
-
-    log("-> number of pulses: ", bindMode);
-    // noInterrupts();
-
-    for (int j = 0; j < bindMode; j++) {
-      digitalWrite(rxPin, HIGH);                  // sets the digital pin on
-      delayMicroseconds(BINDING_PULSE_DELAY_MS);  // waits
-      digitalWrite(rxPin, LOW);                   // sets the digital pin  off
-      delayMicroseconds(BINDING_PULSE_DELAY_MS);  // waits
-    }
-    // digitalWrite(rxPin, HIGH); // sets the digital pin on
-    // interrupts();
-    log("-> number of pulses DONE");
-
-    delay(500);
-    pinMode(rxPin, INPUT);  // sets the digital pin 13 as input
-  }
-}
+};

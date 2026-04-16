@@ -3,7 +3,7 @@
 #include "SpektrumSatellite.h"
 
 /**
- * Sometimes the neutral input position is not exactly the the middle of min and
+ * @brief Sometimes the neutral input position is not exactly the the middle of min and
  * max. We allow the definition of a non central netral position:
  *
  * e.g. a Joystick sends values between 0 and 100 - but if the joystick is not

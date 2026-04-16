@@ -1,8 +1,13 @@
 #pragma once
 
+#include <type_traits>
+
 #include "SpektrumSatellite.h"
 
 /**
+ * @class Scaler
+ * @brief Scale from and to defined range. 
+ * 
  * The Scaler<T> class provides functionality to scale values from one range to
  * another, and to reverse the scaling (de-scale). It is designed to be used
  * with numeric types (such as int, float, or float) and is useful for mapping
@@ -33,27 +38,14 @@ class Scaler {
 
   T scale(float value) {
     if (this->active) {
-      // prevent NPE
-      if (outMax == outMin) return 0;
-      // (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-      float r =
-          (((float)value - (float)inMin) * ((float)outMax - (float)outMin) /
-               ((float)inMax - (float)inMin) +
-           (float)outMin);
-      value = round(r);
+      value = map((T)value, inMin, inMax, outMin, outMax);
     }
     return value;
   }
 
   float deScale(T value) {
     if (this->active) {
-      // prevent NPE
-      if (outMax == outMin) return 0;
-      float result =
-          (((float)value - (float)outMin) * ((float)inMax - (float)inMin) /
-               ((float)outMax - (float)outMin) +
-           (float)inMin);
-      value = round(result);
+      value = map(value, outMin, outMax, inMin, inMax);
     }
     return value;
   }
@@ -61,5 +53,23 @@ class Scaler {
  private:
   bool active = false;
   T inMin, inMax, outMin, outMax;
-};
 
+  template <typename U = T>
+  typename std::enable_if<std::is_floating_point<U>::value, U>::type finalize(
+      U value) {
+    return round(value);
+  }
+
+  template <typename U = T>
+  typename std::enable_if<!std::is_floating_point<U>::value, U>::type finalize(
+      U value) {
+    return value;
+  }
+
+  T map(T value, T fromMin, T fromMax, T toMin, T toMax) {
+    if (fromMax == fromMin) return toMin;
+    T r =
+        ((value - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin);
+    return finalize(r);
+  }
+};
