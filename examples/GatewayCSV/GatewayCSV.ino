@@ -24,16 +24,16 @@
 #endif
 
 
-const char* ssid = "Phil Schatzmann";                 //Change this to your router SSID.
-const char* password =  "sabrina01";        //Change this to your router password.
+const char* ssid = "ssid";                 //Change this to your router SSID.
+const char* password =  "pwd";        //Change this to your router password.
 const char * udpAddress = "10.147.17.0";  //Change this to match your network
 const int udpPort = 6789;                 //Change this if you need another port 
-unsigned long intervall = 1000;            // send every 500ms (=2 messages per second)
+unsigned long intervall = 1000;            // send every 1000ms (=1 message per second)
 unsigned long intervallTime;
-uint8_t* buffer = new uint8_t[10*MAX_CHANNELS+1];
+uint8_t buffer[10*MAX_CHANNELS+1];
 
 SpektrumSatellite<float> satellite(Serial2); // we use doubles!
-SpektrumCSV<float> csv(',',true);
+SpektrumCSV<float> csv(',', 2, true);
 WiFiUDP udp;
 
 
@@ -64,6 +64,7 @@ void loop() {
 
   if (millis()>intervallTime) {
     if (satellite.getFrame()) {   
+      intervallTime = millis()+intervall;
       // send CSV via UDP
       csv.toString(satellite, buffer, sizeof(buffer));
       int len = strlen((char*)buffer);

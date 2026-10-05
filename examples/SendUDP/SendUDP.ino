@@ -75,8 +75,7 @@ void loop() {
 
     // read values from pins
     for (int j=0;j<pins; j++){
-      int value = analogRead(inPins[j]);
-      Channel channel = (Channel) (j+1);
+      Channel channel = (Channel) j;
       satellite.setChannelValue(channel, analogRead(inPins[j]));
     }
 
@@ -86,8 +85,7 @@ void loop() {
     udp.endPacket();
 
     // log data as CSV to console
-    csv.toString(satellite, buffer, 1024);
-    satellite.sendData(buffer);   
+    csv.toString(satellite, buffer, sizeof(buffer));
     Serial.print((char*)buffer);      
   } 
 }

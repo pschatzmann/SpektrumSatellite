@@ -12,15 +12,16 @@ namespace spektrum_satellite {
  *
  * @tparam T Channel value type used by `SpektrumSatellite` (e.g. `uint16_t`,
  * `float`).
+ * @tparam ScalerT Scaler class used by `SpektrumSatellite`.
  */
-template <class T>
+template <class T, class ScalerT = Scaler<T>>
 class SpektrumCSV {
  public:
   /**
    * @brief Construct a CSV serializer/parser.
    *
    * @param delimiter Field separator character used between channels.
-   * @param decimals Number of decimals used when formatting values.
+   * @param decimals Number of decimals used when formatting values (0-9).
    * @param isTranslated
    *  - `true`: use translated/scaled values via `getChannelValue()` and
    *    `setChannelValue()`.
@@ -30,93 +31,83 @@ class SpektrumCSV {
               bool isTranslated = true) {
     this->delimiter = delimiter;
     this->isTranslated = isTranslated;
-    // determine format string e.g. "%.2f"
-    strcpy(format, "%.");
-    char decimalsTxt[10];
-    itoa(decimals, decimalsTxt, 10);
-    strcat(format, decimalsTxt);
-    strcat(format, "f");
+    if (decimals < 0) decimals = 0;
+    if (decimals > 9) decimals = 9;
+    this->decimals = decimals;
   }
 
   /**
    * @brief Serialize all channels to CSV.
    *
    * Produces one line with `MAX_CHANNELS` values separated by
-   * `delimiter`, terminated by `\n`.
+   * `delimiter`, terminated by `\n`. The output is truncated if it does not
+   * fit into `len` bytes (including the terminating 0).
    *
    * @param satellite Source satellite instance.
-   * @param dataSting Output byte buffer receiving the CSV text.
-   * @param maxLen Maximum available size of `dataSting`.
+   * @param str Output byte buffer receiving the CSV text.
+   * @param len Size of `str`.
    */
-  void toString(SpektrumSatellite<T>& satellite, uint8_t str[], uint16_t len) {
-    uint8_t* start = str;
+  void toString(SpektrumSatellite<T, ScalerT>& satellite, uint8_t str[],
+                uint16_t len) {
+    if (len == 0) return;
+    char* out = (char*)str;
+    size_t remaining = len;
+    out[0] = 0;
     for (int j = 0; j < MAX_CHANNELS; j++) {
       float val = isTranslated ? satellite.getChannelValue((Channel)j)
-                               : satellite.getChannelValuesRaw()[(Channel)j];
-      int len = sprintf((char*)start, format, val);
-      start += len;
-      if (j < MAX_CHANNELS - 1) {
-        *start = delimiter;
-        start++;
-      }
+                               : satellite.getChannelValuesRaw()[j];
+      char number[32];
+      formatValue(val, number, sizeof(number));
+      char separator = j < MAX_CHANNELS - 1 ? delimiter : '\n';
+      int n = snprintf(out, remaining, "%s%c", number, separator);
+      if (n < 0 || (size_t)n >= remaining) break;  // truncated
+      out += n;
+      remaining -= n;
     }
-    sprintf((char*)start, "\n");
   }
 
   /**
    * @brief Parse CSV channel values and write them into `satellite`.
    *
-   * @param str Input CSV line buffer.
+   * @param str Input CSV line buffer (0 terminated).
    * @param satellite Destination satellite instance.
    * @return `true` if at least one value was parsed, otherwise `false`.
    */
-  bool parse(uint8_t* str, SpektrumSatellite<T>& satellite) {
+  bool parse(uint8_t* str, SpektrumSatellite<T, ScalerT>& satellite) {
     bool result = false;
     char* start = (char*)str;
     for (int j = 0; j < MAX_CHANNELS; j++) {
-      Channel ch = (Channel)j;
-      char* end = findEnd(start);
-      if (end == NULL) {
-        break;
-      }
-      result = true;
+      char* end;
       double value = strtod(start, &end);
+      if (end == start) break;  // no number found
+      result = true;
       if (isTranslated) {
-        satellite.setChannelValue(ch, value);
+        satellite.setChannelValue((Channel)j, value);
       } else {
         satellite.getChannelValuesRaw()[j] = value;
       }
+      if (*end != delimiter) break;  // end of line
       start = end + 1;
     }
     return result;
   }
-
-  /**
-   * @brief Set an optional value scaling factor.
-   *
-   * @note This function is declared but not implemented in this header.
-   */
-  void setFactor(double factor);
 
  private:
   /// Field delimiter used for CSV serialization/parsing.
   char delimiter;
   /// Use scaled values (`true`) or raw values (`false`).
   bool isTranslated;
-  /// `sprintf` format string, e.g. `"%.2f"`.
-  char format[15];
+  /// Number of decimals
+  int decimals;
 
-  /**
-   * @brief Find end-of-field marker in a CSV line.
-   * @param start Pointer to current field start.
-   * @return Pointer to delimiter/newline/end marker or `NULL` if not found.
-   */
-  char* findEnd(char* start) {
-    char* end = strchr(start, delimiter);
-    if (end == NULL) {
-      end = strchr(start, '\n');
-    }
-    return end;
+  void formatValue(float value, char* buffer, size_t size) {
+#ifdef __AVR__
+    // AVR printf does not support %f
+    (void)size;
+    dtostrf(value, 1, decimals, buffer);
+#else
+    snprintf(buffer, size, "%.*f", decimals, value);
+#endif
   }
 };
 

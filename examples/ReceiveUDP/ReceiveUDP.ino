@@ -83,8 +83,7 @@ void loop() {
       }  
   
       // log data as CSV to console
-      csv.toString(satellite, buffer, 1024);
-      satellite.sendData(buffer);   
+      csv.toString(satellite, buffer, sizeof(buffer));
       Serial.print((char*)buffer);       
     } 
   }

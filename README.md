@@ -1,10 +1,10 @@
-# Spectrum Satellite API for Arduino
+# Spektrum Satellite API for Arduino
 
 [![Arduino Library](https://img.shields.io/badge/Arduino-Library-blue.svg)](https://www.arduino.cc/reference/en/libraries/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 
- This project implements an Arduino API for the Spectrum Satellite Receiver. It should work with any type of board (e.g. Arduinos, ESP32, ESP8266 etc)
+ This project implements an Arduino API for the Spektrum Satellite Receiver. It should work with any type of board (e.g. Arduinos, ESP32, ESP8266 etc)
 
  - Complete Implementation of the Specification (See https://www.spektrumrc.com/ProdInfo/Files/Remote%20Receiver%20Interfacing%20Rev%20A.pdf)
  - Support for sending data
@@ -12,27 +12,44 @@
  - Support for all channels
  - Support for binding using different BindModes
  - Automatic handling of 1024 or 2048 servo data
- - Support of different data types and automatic scaling of channel values 
+ - Support of different data types and automatic scaling of channel values
  - Optional Support of logging using a specified Serial pin
  - Provides Serialization to and from CSV format
 
 ## Usage Scenarios
 The following usage scenarios are supported and documented with examples
  - Binding of a Spektrum Satellite (Bind)
- - Implement a Receiver:  Receive Serial Satellite Data and update PWN Pins (Receive)
- - Implement a Remote Control Radio: Reads Analog input Pins and sends it out in the Serial Spektrum Format  - Receive Serial Satellite Data and send it e.g. via UDP (Gateway)
+ - Implement a Receiver: Receive Serial Satellite Data and update PWM Pins (Receive)
+ - Implement a Remote Control Radio: Read Analog Input Pins and send the values via UDP (SendUDP)
+ - Implement the matching Receiver: Receive the data via UDP and update the Servos (ReceiveUDP)
+ - Receive Serial Satellite Data and send it e.g. via UDP (Gateway)
  - Receive Serial Satellite Data and send it as CSV e.g. via UDP (GatewayCSV)
-(SendUDP)
 
 ## Basic Syntax
-The SpektrumSatellite class expects a Stream (HardwareSerial, SoftwareSerial, UDP etc) as parameter.  You need to make sure that you set the exected baud rate (e.g. with Serial.begin(SPEKTRUM_SATELLITE_BPS)). 
+The SpektrumSatellite class expects a Stream (HardwareSerial, SoftwareSerial, UDP etc) as parameter. You need to make sure that you set the expected baud rate (e.g. with Serial.begin(SPEKTRUM_SATELLITE_BPS)).
 
+The template parameter defines the data type of the channel values. With setChannelValueRange() the values are scaled automatically from and to the range supported by the protocol (0-1023 or 0-2047):
+
+```
+SpektrumSatellite<float> satellite(Serial2);
+satellite.setChannelValueRange(-1.0f, 1.0f);
+```
+
+If the neutral input position is not in the middle of the range, you can use the ScalerWithNeutral:
+
+```
+#include "ScalerWithNeutral.h"
+
+SpektrumSatellite<float, ScalerWithNeutral<float>> satellite(Serial2);
+satellite.getScaler()->setNeutral(1100); // raw neutral position
+satellite.setChannelValueRange(-1.0f, 1.0f);
+```
 
 ## Example: Implementing a Remote Control
 
-In this Example we use of the SpektrumSatellite class to read the data from analog lines and send it via Bloothooth: With this we can implement a simple custom remote control running on a ESP32 which reads the joystick values and sends them out to a receiver.
+In this Example we use the SpektrumSatellite class to read the data from analog lines and send it via Bluetooth: With this we can implement a simple custom remote control running on an ESP32 which reads the joystick values and sends them out to a receiver.
 Please check and adapt the pin assignments of your Microcontroller.
-  
+
 ```
 #include "BluetoothSerial.h"
 #include "SpektrumSatellite.h"
@@ -40,10 +57,10 @@ Please check and adapt the pin assignments of your Microcontroller.
 const char* bt_name = "RemoteControl";
 const char* bt_address = "HC-05";
 const char* bt_pin = "1234";
-const int  inputPins[] = {13, 12, 14, 27, 26, 25, 33, 32};  // analog input pins 
+const int  inputPins[] = {13, 12, 14, 27, 26, 25, 33, 32};  // analog input pins
 const int  numberOfPins = sizeof(inputPins)/sizeof(inputPins[0]);
-const long intervall = 500;
-long intervallTimeout;
+const unsigned long intervall = 500;
+unsigned long intervallTimeout;
 
 BluetoothSerial SerialBT;
 SpektrumSatellite<uint16_t> satellite(SerialBT);
@@ -60,15 +77,15 @@ void setup() {
 
   // connect to BT
   SerialBT.begin(bt_name, true); //Bluetooth device name
-  SerialBT.setPin(bt_pin);
+  SerialBT.setPin(bt_pin, strlen(bt_pin));
   SerialBT.connect(bt_address);
   while(!SerialBT.connected()) {
     Serial.println(".");
     delay(1000);
   }
-  Serial.println("Connected to BT Succesfully!");
+  Serial.println("Connected to BT Successfully!");
 
-  
+
   // setup Input pins
   for (auto const& pin : inputPins){
     pinMode(pin,INPUT);
@@ -77,28 +94,28 @@ void setup() {
 
 
 void loop() {
-  
+
   // send only every 500ms
   if (millis()>intervallTimeout) {
-     intervallTimeout = millis()+intervall;
+    intervallTimeout = millis()+intervall;
 
     // read values from pins
     for (int j=0;j<numberOfPins; j++){
-      Channel channel = (Channel) (j+1);
+      Channel channel = (Channel) j;
       int value = analogRead(inputPins[j]);
       satellite.setChannelValue(channel, value);
     }
 
     // send binary data
     satellite.sendData();
-  } 
-  
+  }
+
 }
 
 ```
 ## Example: Implementing the Receiver on the RC Airplane
 
-In the following Example we use the SpektrumSatellite class on an Arduino Nano with the HC-05 Bluetooth module to receive the  data in order to update the servos. 
+In the following Example we use the SpektrumSatellite class on an Arduino Nano with the HC-05 Bluetooth module to receive the data in order to update the servos.
 
 We use SoftwareSerial instead of the built in Serial interface so that we can keep the logging functionality to the console.
 
@@ -108,11 +125,11 @@ We use SoftwareSerial instead of the built in Serial interface so that we can ke
 #include "Servo.h"
 
 SoftwareSerial SpektrumSerial(12, 13); // connect TX only after checking the voltage!
-SpektrumSatellite<uint16_t> satellite(SpektrumSerial); // Assing satellite to Serial (use Serial1 or Serial2 if available!)
+SpektrumSatellite<uint16_t> satellite(SpektrumSerial); // Assign satellite to SoftwareSerial
 const int pins = 6;  // number of channels for servos
 Servo servos[pins];  // allocate servos for all channels
-int pwmPins[] = {2, 0, 4, 5, 6, 7};  // servo pins 
-int failSaveValues[] = {0,90,90,90,90,90}; // neutrol positions
+int pwmPins[] = {2, 3, 4, 5, 6, 7};  // servo pins
+int failSafeValues[] = {0,90,90,90,90,90}; // neutral positions
 
 
 void setup() {
@@ -123,13 +140,13 @@ void setup() {
   Serial.println();
   Serial.println("setup");
 
-  // Activate the loggin to the console only if SpektrumSatellite is not using Serial
+  // Activate the logging to the console only if SpektrumSatellite is not using Serial
   satellite.setLog(Serial);
 
   //scale the values from 0 to 180 degrees for PWM
   satellite.setChannelValueRange(0, 180);
 
-  
+
   // setup PWM pins
   for (int j=0;j<pins; j++){
     servos[j].attach(pwmPins[j]);
@@ -146,25 +163,25 @@ void setup() {
 }
 
 void loop() {
-  
-  if (satellite.getFrame()) {   
+
+  if (satellite.getFrame()) {
     for (int j=0;j<pins; j++){
-       Channel ch = static_cast<Channel>(j);   
+       Channel ch = static_cast<Channel>(j);
        long value = satellite.getChannelValue(ch);
        servos[j].write(value);
-    }        
+    }
     digitalWrite(LED_BUILTIN,HIGH);
-  } 
+  }
 
-  // if we loose the connection we set the values to neutral 
+  // if we lose the connection we set the values to neutral
   if (!satellite.isConnected()) {
-    satellite.log("Invoking fail save values");   
+    Serial.println("Invoking fail safe values");
     for (int j=0;j<pins; j++){
-       servos[j].write(failSaveValues[j]);
-    }        
+       servos[j].write(failSafeValues[j]);
+    }
     digitalWrite(LED_BUILTIN,LOW);
   }
-  
+
 }
 
 ```
@@ -174,9 +191,9 @@ void loop() {
 - [SpektrumSatellite](https://pschatzmann.github.io/SpektrumSatellite/docs/html/classspektrum__satellite_1_1SpektrumSatellite.html)
 
 ## Installation
-You can download this project as ZIP and in the Arduino IDE use -> Sketch -> Include Library -> Add ZIP Library. 
+You can download this project as ZIP and in the Arduino IDE use -> Sketch -> Include Library -> Add ZIP Library.
 
-The recommended way howerver is to clone the project to your libraries directory. E.g. with
+The recommended way however is to clone the project to your libraries directory. E.g. with
 
 ```
     cd ~/Documents/Arduino/libraries

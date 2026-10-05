@@ -15,7 +15,7 @@ void testScaling() {
 
   for (int j=0;j<10;j++){
       int scaled = s.scale(j);
-      int back = s.deScale(scaled);
+      int back = round(s.deScale(scaled));
       Serial.print(j);
       Serial.print("->");
       Serial.print(scaled);
@@ -114,7 +114,7 @@ void testRange1000() {
   Serial.println(satellite.getChannelValue(Throttle) == 1000 ?"ok" : "failed");
 
   Serial.print("testRange1000 raw =>> ");
-  Serial.println(satellite.getChannelValuesRaw()[Throttle] == 2048 ?"ok" : "failed");
+  Serial.println(satellite.getChannelValuesRaw()[Throttle] == 2047 ?"ok" : "failed");
 
 }
 
@@ -128,7 +128,7 @@ void testFloat() {
   satellite.setThrottle(1.0);
 
   Serial.print("testFloat getChannelValuesRaw => ");
-  Serial.println(satellite.getChannelValuesRaw()[Throttle] == 2048?"ok" : "failed");
+  Serial.println(satellite.getChannelValuesRaw()[Throttle] == 2047?"ok" : "failed");
 
   Serial.print("testFloat getThrottle => ");
   Serial.println(satellite.getThrottle() == 1.0 ? "ok" : "failed");
@@ -202,6 +202,52 @@ void testBinary() {
   }
 }
 
+void testFullScaleOnWire() {
+  Serial.println("***********************");
+  Serial.println("testFullScaleOnWire");
+  SpektrumSatellite<uint16_t> sender(Serial);
+  sender.setChannelValueRange(0, 1000);
+  sender.setThrottle(1000);
+
+  SpektrumSatellite<uint16_t> receiver(Serial);
+  receiver.setChannelValueRange(0, 1000);
+  receiver.parseFrame(sender.getSendBuffer(false));
+
+  Serial.print("testFullScaleOnWire throttle => ");
+  Serial.println(receiver.getThrottle() == 1000 ? "ok" : "failed");
+}
+
+void testAuxKeepsThrottle() {
+  Serial.println("***********************");
+  Serial.println("testAuxKeepsThrottle");
+  SpektrumSatellite<uint16_t> sender(Serial);
+  sender.setThrottle(500);
+  sender.setAux3(300);
+
+  SpektrumSatellite<uint16_t> receiver(Serial);
+  receiver.parseFrame(sender.getSendBuffer(false));
+  receiver.parseFrame(sender.getSendBuffer(true));
+
+  Serial.print("testAuxKeepsThrottle throttle => ");
+  Serial.println(receiver.getThrottle() == 500 ? "ok" : "failed");
+  Serial.print("testAuxKeepsThrottle aux3 => ");
+  Serial.println(receiver.getAux3() == 300 ? "ok" : "failed");
+}
+
+void testInvalidSystemRejected() {
+  Serial.println("***********************");
+  Serial.println("testInvalidSystemRejected");
+  SpektrumSatellite<uint16_t> satellite(Serial);
+  satellite.setThrottle(500);
+  Data frame = *satellite.getSendBuffer(false);
+  frame.header.internal.system = 0x55;
+  satellite.setThrottle(0);
+
+  Serial.print("testInvalidSystemRejected => ");
+  bool ok = !satellite.parseFrame(&frame) && satellite.getThrottle() == 0;
+  Serial.println(ok ? "ok" : "failed");
+}
+
 void testWaitForData() {
   Serial.println("***********************");
   Serial.println("testCSV waitForData -> ");
@@ -252,6 +298,9 @@ void setup() {
   testHeader();
   testCSV();
   testBinary();
+  testFullScaleOnWire();
+  testAuxKeepsThrottle();
+  testInvalidSystemRejected();
   testWaitForData();
 }
 

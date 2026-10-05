@@ -1,18 +1,14 @@
 #pragma once
 
-#include <type_traits>
-
-#include "SpektrumSatellite.h"
-
 namespace spektrum_satellite {
 
 /**
  * @class Scaler
- * @brief Scale from and to defined range. 
- * 
+ * @brief Scale from and to defined range.
+ *
  * The Scaler<T> class provides functionality to scale values from one range to
  * another, and to reverse the scaling (de-scale). It is designed to be used
- * with numeric types (such as int, float, or float) and is useful for mapping
+ * with numeric types (such as int, float, or double) and is useful for mapping
  * input values (e.g., sensor readings) to output ranges (e.g., actuator
  * commands).
  * @author Phil Schatzmann
@@ -38,16 +34,18 @@ class Scaler {
 
   bool isActive() { return this->active; }
 
+  /// Scales from the input range to the output range
   T scale(float value) {
     if (this->active) {
-      value = map((T)value, inMin, inMax, outMin, outMax);
+      value = map(value, inMin, inMax, outMin, outMax);
     }
-    return value;
+    return finalize(value);
   }
 
+  /// Scales from the output range back to the input range (not rounded)
   float deScale(T value) {
     if (this->active) {
-      value = map(value, outMin, outMax, inMin, inMax);
+      return map(value, outMin, outMax, inMin, inMax);
     }
     return value;
   }
@@ -56,23 +54,20 @@ class Scaler {
   bool active = false;
   T inMin, inMax, outMin, outMax;
 
-  template <typename U = T>
-  typename std::enable_if<std::is_floating_point<U>::value, U>::type finalize(
-      U value) {
-    return round(value);
+  /// Rounds the result for integral types, keeps the fraction otherwise
+  static T finalize(float value) {
+    bool isIntegral = (T)0.5f == (T)0;
+    if (isIntegral) {
+      value = value < 0 ? value - 0.5f : value + 0.5f;
+    }
+    return (T)value;
   }
 
-  template <typename U = T>
-  typename std::enable_if<!std::is_floating_point<U>::value, U>::type finalize(
-      U value) {
-    return value;
-  }
-
-  T map(T value, T fromMin, T fromMax, T toMin, T toMax) {
+  /// Calculation is done in float to avoid integer overflow and truncation
+  static float map(float value, float fromMin, float fromMax, float toMin,
+                   float toMax) {
     if (fromMax == fromMin) return toMin;
-    T r =
-        ((value - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin);
-    return finalize(r);
+    return (value - fromMin) * (toMax - toMin) / (fromMax - fromMin) + toMin;
   }
 };
 

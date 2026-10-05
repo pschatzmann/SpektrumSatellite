@@ -1,3 +1,4 @@
+/**
  * Example Use of the SpektrumSatellite to receive the data on the RX line and send it
  * as binary data via UDP.
  * 
@@ -6,7 +7,6 @@
  */
 
 #include "SpektrumSatellite.h"
-#include "SpektrumCSV.h"
 
 #ifdef ESP32
   #include <WiFi.h>
@@ -27,10 +27,8 @@ const char * udpAddress = "10.147.17.0";  //Change this to match your network
 const int udpPort = 6789;                 //Change this if you need another port 
 unsigned long intervall = 500;            // send every 500ms (=2 messages per second)
 unsigned long intervallTime;
-uint8_t* buffer = new uint8_t[10*MAX_CHANNELS+1];
 
-SpektrumSatellite<float> satellite(Serial2); // we use doubles!
-SpektrumCSV<float> csv(',');
+SpektrumSatellite<uint16_t> satellite(Serial2);
 WiFiUDP udp;
 
 
@@ -54,9 +52,10 @@ void loop() {
 
   if (millis()>intervallTime) {
     if (satellite.getFrame()) {   
-      // send via UDP
+      intervallTime = millis()+intervall;
+      // send the binary frame via UDP (sendData() would write to Serial2)
       udp.beginPacket(udpAddress, udpPort);
-      satellite.sendData();
+      udp.write((uint8_t*)satellite.getSendBuffer(), sizeof(Data));
       udp.endPacket();
     } 
   }

@@ -30,7 +30,7 @@
 #define MASK_2048_CHANID 0x7800
 #define MASK_2048_SXPOS 0x07FF
 #define SEND_BUFFER_SIZE sizeof(Data)
-#define BINDING_PULSE_DELAY_MS 100
+#define BINDING_PULSE_DELAY_US 100
 #define SPEKTRUM_SATELLITE_BPS 125000
 
 namespace spektrum_satellite {
@@ -179,79 +179,82 @@ class SpektrumSatellite {
 
   /// @brief Starts bind sequence via power and RX pins.
   void startBinding(unsigned powerPin, unsigned rxPin) {
-    // switch off serial interface
-    if (serial) {
-      log("startBinding");
+    log("startBinding");
+    status = Binding;
 
-      pinMode(rxPin, OUTPUT);       // sets the digital pin as output
-      digitalWrite(rxPin, LOW);     // make sure that the pin off
-      pinMode(powerPin, OUTPUT);    // sets the digital pin as output
-      digitalWrite(powerPin, LOW);  // make sure that the pin off
-      digitalWrite(rxPin, HIGH);    // set initial state to high
-      delay(2000);
+    pinMode(rxPin, OUTPUT);       // sets the digital pin as output
+    digitalWrite(rxPin, LOW);     // make sure that the pin off
+    pinMode(powerPin, OUTPUT);    // sets the digital pin as output
+    digitalWrite(powerPin, LOW);  // make sure that the pin off
+    digitalWrite(rxPin, HIGH);    // set initial state to high
+    delay(2000);
 
-      // To put a receiver into bind mode, within 200ms of power application
-      // the host device needs to issue a series of falling pulses
-      pinMode(powerPin, OUTPUT);     // sets the digital pin as output
-      digitalWrite(powerPin, HIGH);  // make sure that the pin off
-      delay(50);
+    // To put a receiver into bind mode, within 200ms of power application
+    // the host device needs to issue a series of falling pulses
+    pinMode(powerPin, OUTPUT);     // sets the digital pin as output
+    digitalWrite(powerPin, HIGH);  // make sure that the pin off
+    delay(50);
 
-      log("-> number of pulses: ", bindMode);
+    log("-> number of pulses: ", bindMode);
 
-      for (int j = 0; j < bindMode; j++) {
-        digitalWrite(rxPin, HIGH);                  // sets the digital pin on
-        delayMicroseconds(BINDING_PULSE_DELAY_MS);  // waits
-        digitalWrite(rxPin, LOW);                   // sets the digital pin off
-        delayMicroseconds(BINDING_PULSE_DELAY_MS);  // waits
-      }
-
-      log("-> number of pulses DONE");
-
-      delay(500);
-      pinMode(rxPin, INPUT);  // sets the pin as input
+    for (int j = 0; j < bindMode; j++) {
+      digitalWrite(rxPin, HIGH);                  // sets the digital pin on
+      delayMicroseconds(BINDING_PULSE_DELAY_US);  // waits
+      digitalWrite(rxPin, LOW);                   // sets the digital pin off
+      delayMicroseconds(BINDING_PULSE_DELAY_US);  // waits
     }
+
+    log("-> number of pulses DONE");
+
+    delay(500);
+    pinMode(rxPin, INPUT);  // sets the pin as input
+
+    status = NotConnected;
   }
 
   /// @brief Reads and parses one frame from the stream.
+  /// @param transactionTimeMs if no valid frame was received within this
+  /// period the status is set to NotConnected
   bool getFrame(int transactionTimeMs = DEFAULT_RECEIVING_TIMEOUT) {
-    short inByte;
+    const long frameSize = SEND_BUFFER_SIZE;
     byte inData[SEND_BUFFER_SIZE];
-    bool result = false;
     long available = serial->available();
 
     // 16-byte data packet every 11ms or 22ms
-    if (available >= 16) {
-      timeOfLastRead = millis();
-      // resynchronize and use last data
-      if (!processAllData && available > 16) {
-        long diff = available - 16;
-        log("skipping number of bytes:", diff);
-        // skip unnecessary data
-        for (int j = 0; j < diff; j++) serial->read();
+    if (available < frameSize) {
+      if (status == Receiving && !isConnected(transactionTimeMs)) {
+        log("Connection lost");
+        status = NotConnected;
       }
-
-      // read the latest data packet
-      inByte = serial->readBytes(inData, 16);
-      if (inByte != 16) {
-        log("We could not read all data");
-        result = false;
-      } else {
-        // check if we processed the data within indicated time period
-        result = isConnected(transactionTimeMs);
-        if (result) {
-          parseFrame(inData);
-          // check if the frame is valid
-          result = isValidSystem(this->system);
-          status = Receiving;
-
-          // log status
-          logFrame(available, result);
-        } else {
-          log("Frame ignored because of timeout");
-        }
-      }
+      return false;
     }
 
+    // resynchronize and use last complete frame: we skip only whole frames
+    // so that we keep the frame alignment
+    if (!processAllData && available >= 2 * frameSize) {
+      long diff = (available / frameSize - 1) * frameSize;
+      log("skipping number of bytes:", diff);
+      for (long j = 0; j < diff; j++) serial->read();
+    }
+
+    // read the latest data packet
+    if ((long)serial->readBytes(inData, frameSize) != frameSize) {
+      log("We could not read all data");
+      return false;
+    }
+
+    bool result = parseFrame(inData);
+    if (result) {
+      timeOfLastRead = millis();
+      status = Receiving;
+    } else if (isInternal()) {
+      // invalid system byte: we are most likely not aligned to the frame
+      // start, so we shift by one byte to resynchronize
+      serial->read();
+    }
+
+    // log status
+    logFrame(available, result);
     return result;
   }
 
@@ -292,7 +295,11 @@ class SpektrumSatellite {
   /// @brief Sets a channel value using the public value type.
   void setChannelValue(Channel channelId, T value) {
     if (channelId >= Throttle && channelId <= Aux7) {
-      channelValues[channelId] = scaler.deScale(value);
+      // round and limit to the range supported by the protocol
+      float raw = scaler.deScale(value);
+      if (raw < 0) raw = 0;
+      if (raw > maskVALUE) raw = maskVALUE;
+      channelValues[channelId] = (uint16_t)(raw + 0.5f);
       if (channelId >= Aux1) {
         isSendAuxData = true;
       }
@@ -327,7 +334,7 @@ class SpektrumSatellite {
 
   /// @brief Sends a binary Spektrum frame.
   void sendData() {
-    if (sendCount > 0 && sendCount++ % logMod == 0) {
+    if (logMod > 0 && sendCount++ % logMod == 0) {
       log("sendData");
     }
     Data* data = getSendBuffer();
@@ -352,7 +359,7 @@ class SpektrumSatellite {
   bool isConnected() { return isConnected(TRANSACTION_TIME); }
   /// @brief Returns `true` if connected within the given timeout.
   bool isConnected(long timeoutMs) {
-    return (millis() - timeOfLastRead < timeoutMs);
+    return (millis() - timeOfLastRead < (unsigned long)timeoutMs);
   }
 
   /// @brief Blocks until at least one byte is available.
@@ -366,6 +373,7 @@ class SpektrumSatellite {
 
   /// @brief Returns the display name of a channel.
   const char* getChannelName(Channel channelId) {
+    if (channelId < Throttle || channelId > Aux7) return "";
     return ChannelNames[channelId];
   }
 
@@ -375,7 +383,7 @@ class SpektrumSatellite {
     rangeMin = min;
     rangeMax = max;
     isChannelRangeConfigured = true;
-    scaler.setValues(0, is2048() ? 2048 : 1024, min, max);
+    scaler.setValues(0, maskVALUE, min, max);
     log("setChannelValueRange <-");
   }
 
@@ -396,7 +404,7 @@ class SpektrumSatellite {
     }
 
     if (isChannelRangeConfigured) {
-      scaler.setValues(0, is2048() ? 2048 : 1024, rangeMin, rangeMax);
+      scaler.setValues(0, maskVALUE, rangeMin, rangeMax);
     }
   }
 
@@ -439,7 +447,8 @@ class SpektrumSatellite {
   /// @brief Enables/disables processing of all buffered bytes.
   void setProcessAllData(bool flag) { processAllData = flag; }
 
-  /// @brief Parses a raw 16-byte frame.
+  /// @brief Parses a raw 16-byte frame. Returns false if the frame was
+  /// rejected because of an invalid system.
   bool parseFrame(byte* inData) { return parseFrame((Data*)inData); }
   /// @brief Parses a typed frame structure.
   bool parseFrame(Data* inData) {
@@ -453,13 +462,16 @@ class SpektrumSatellite {
         isSystemReported = true;
       }
       if (recevedSystem != getSystem()) {
-        if (isValidSystem(recevedSystem))
-          setSystem(recevedSystem);
-        else
+        if (!isValidSystem(recevedSystem)) {
           logHex("Unexpected system", recevedSystem);
+          return false;
+        }
+        setSystem(recevedSystem);
       }
     } else {
-      this->fades = data->header.fades;
+      uint16_t fades = data->header.fades;
+      swapBytes(&fades);
+      this->fades = fades;
     }
 
     uint16_t channelShift = is2048() ? 11 : 10;
@@ -469,7 +481,7 @@ class SpektrumSatellite {
       uint16_t channelID = (inValue & maskCHANID) >> channelShift;
       uint16_t channelValue = inValue & maskVALUE;
 
-      if (channelID >= 0 && channelID < MAX_CHANNELS) {
+      if (channelID < MAX_CHANNELS) {
         channelValues[channelID] = channelValue;
       }
     }
@@ -477,8 +489,8 @@ class SpektrumSatellite {
   }
   /// @brief Builds a frame buffer for sending.
   Data* getSendBuffer(boolean auxData) {
-    // Clear only the values array and header
-    for (int i = 0; i < 7; ++i) dataPacket.values[i] = 0;
+    // unused slots are 0xFFFF: this decodes to an invalid channel id
+    for (int i = 0; i < 7; ++i) dataPacket.values[i] = 0xFFFF;
     dataPacket.header.fades = 0;
 
     uint16_t channelShift = is2048() ? 11 : 10;
@@ -500,7 +512,9 @@ class SpektrumSatellite {
       dataPacket.header.internal.fades = this->fades;
       dataPacket.header.internal.system = this->system;
     } else {
-      dataPacket.header.fades = this->fades;
+      uint16_t fades = this->fades;
+      swapBytes(&fades);
+      dataPacket.header.fades = fades;
     }
 
     return &dataPacket;
@@ -517,30 +531,30 @@ class SpektrumSatellite {
   uint16_t* getChannelValuesRaw() { return channelValues; }
 
  protected:
-  uint16_t channelValues[12];
-  Data dataPacket;  //;uint16_t sendValues[7];
-  unsigned long timeOfLastRead;
-  unsigned long successCount;
-  unsigned long failCount;
-  unsigned long frameCount;
-  unsigned long sendCount;
-  uint16_t maskCHANID;
-  uint16_t maskVALUE;
-  uint16_t fades;
-  System system;
+  uint16_t channelValues[MAX_CHANNELS] = {0};
+  Data dataPacket = {};
+  unsigned long timeOfLastRead = 0;
+  unsigned long successCount = 0;
+  unsigned long failCount = 0;
+  unsigned long frameCount = 0;
+  unsigned long sendCount = 0;
+  uint16_t maskCHANID = MASK_2048_CHANID;
+  uint16_t maskVALUE = MASK_2048_SXPOS;
+  uint16_t fades = 0;
+  System system = DSMX_11MS_2048;
   T rangeMin = 0;
   T rangeMax = 100;
-  boolean isInternalFlag;
-  boolean isSendAuxData;
-  boolean isSwapBytes;
-  boolean isSystemReported;
-  boolean isChannelRangeConfigured;
+  boolean isInternalFlag = true;
+  boolean isSendAuxData = false;
+  boolean isSwapBytes = false;
+  boolean isSystemReported = false;
+  boolean isChannelRangeConfigured = false;
   boolean processAllData = false;
   Stream* serial;
   Stream* serialLog = NULL;
   ScalerT scaler;
-  BindMode bindMode;
-  Status status;
+  BindMode bindMode = Internal_DSMx_11ms;
+  Status status = NotConnected;
   long logMod = 1000;
 
   /// @brief Logs a message.
