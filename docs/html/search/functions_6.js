@@ -1,4 +1,30 @@
 var searchData=
 [
-  ['tostring_0',['toString',['../classspektrum__satellite_1_1SpektrumCSV.html#a688ad7cb783ef3b123a38e4d07cfb927',1,'spektrum_satellite::SpektrumCSV']]]
+  ['scale_0',['scale',['../classspektrum__satellite_1_1Scaler.html#ace0e4f415bd1539e6824714a8c7869ad',1,'spektrum_satellite::Scaler']]],
+  ['senddata_1',['senddata',['../classspektrum__satellite_1_1SpektrumSatellite.html#a1c8771ad9fc4bce51cd9a71f8ac5b6e5',1,'spektrum_satellite::SpektrumSatellite::sendData()'],['../classspektrum__satellite_1_1SpektrumSatellite.html#a58bc6c624e4f7bc65c19f66fa711adcc',1,'spektrum_satellite::SpektrumSatellite::sendData(uint8_t *str)']]],
+  ['setaileron_2',['setAileron',['../classspektrum__satellite_1_1SpektrumSatellite.html#ae03b18f228ffd0c11b6f2077c62d7c90',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setaux1_3',['setAux1',['../classspektrum__satellite_1_1SpektrumSatellite.html#a47a7a5e1583139c6f05548bb5fdde09c',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setaux2_4',['setAux2',['../classspektrum__satellite_1_1SpektrumSatellite.html#aa4ad9022da9591ced479405e2c9db382',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setaux3_5',['setAux3',['../classspektrum__satellite_1_1SpektrumSatellite.html#a9d6f7d1cb292991f741664620b4240e8',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setaux4_6',['setAux4',['../classspektrum__satellite_1_1SpektrumSatellite.html#ad3a109487d63951cdf4db8007ff0e4bb',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setaux5_7',['setAux5',['../classspektrum__satellite_1_1SpektrumSatellite.html#a9dfb1658c0fba5db311756ff9b11e15f',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setaux6_8',['setAux6',['../classspektrum__satellite_1_1SpektrumSatellite.html#a14e454e48714016cd2dfc4fe83832447',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setaux7_9',['setAux7',['../classspektrum__satellite_1_1SpektrumSatellite.html#a31e9f3fb88b494d07d02b991ee8fada8',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setbindingmode_10',['setBindingMode',['../classspektrum__satellite_1_1SpektrumSatellite.html#a6637d0ce29562590b412a0dd891deb7c',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setchannelvalue_11',['setChannelValue',['../classspektrum__satellite_1_1SpektrumSatellite.html#ae62cecb78c418af923e17201abc56083',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setchannelvaluerange_12',['setChannelValueRange',['../classspektrum__satellite_1_1SpektrumSatellite.html#a82779fa2d3e2f2ef6a2320493f818d53',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setelevator_13',['setElevator',['../classspektrum__satellite_1_1SpektrumSatellite.html#a9444e7c336f95188d7270ee5072d3b53',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setgear_14',['setGear',['../classspektrum__satellite_1_1SpektrumSatellite.html#a86b3c431c30127fe3b5963d7d7efcd55',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setlog_15',['setLog',['../classspektrum__satellite_1_1SpektrumSatellite.html#a5fdaddd6b22fbfe17885c34146e22c3d',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setlogmod_16',['setLogMod',['../classspektrum__satellite_1_1SpektrumSatellite.html#a6e3878765e652877ab5cba9a90011815',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setneutral_17',['setNeutral',['../classspektrum__satellite_1_1ScalerWithNeutral.html#ac7b51115ba9fcfc52f29bda6c8f18733',1,'spektrum_satellite::ScalerWithNeutral']]],
+  ['setprocessalldata_18',['setProcessAllData',['../classspektrum__satellite_1_1SpektrumSatellite.html#ab5dac7106f3609910bd590f84ad323c7',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setrudder_19',['setRudder',['../classspektrum__satellite_1_1SpektrumSatellite.html#a994abbe9b0a474c82368ff8cf263e904',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setsystem_20',['setSystem',['../classspektrum__satellite_1_1SpektrumSatellite.html#a9456601b4b293e384427f33d1ed9f230',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setthrottle_21',['setThrottle',['../classspektrum__satellite_1_1SpektrumSatellite.html#a1a9da822b44fb50a31a48e886a1c49cf',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['setvalues_22',['setvalues',['../classspektrum__satellite_1_1ScalerWithNeutral.html#a7120cb439b26edd25a3a48e92313a437',1,'spektrum_satellite::ScalerWithNeutral::setValues(T fromMin, T fromMax, T toMin, T toMax)'],['../classspektrum__satellite_1_1ScalerWithNeutral.html#ac93fce4d825f5c59d7a4342118abc654',1,'spektrum_satellite::ScalerWithNeutral::setValues(T fromMin, T fromMax, T fromNeutral, T toMin, T toMax)']]],
+  ['spektrumcsv_23',['SpektrumCSV',['../classspektrum__satellite_1_1SpektrumCSV.html#a307edb106d295cec408281290b7dfa6f',1,'spektrum_satellite::SpektrumCSV']]],
+  ['spektrumsatellite_24',['SpektrumSatellite',['../classspektrum__satellite_1_1SpektrumSatellite.html#aa7de51543ea6386b1b676ecc8b0cd5ae',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['startbinding_25',['startBinding',['../classspektrum__satellite_1_1SpektrumSatellite.html#a7bb5869c7fd5be6f966811dde3f3597c',1,'spektrum_satellite::SpektrumSatellite']]],
+  ['switchendianness_26',['switchEndianness',['../classspektrum__satellite_1_1SpektrumSatellite.html#a4098cc12dfa93bba1437628715e1c667',1,'spektrum_satellite::SpektrumSatellite']]]
 ];
